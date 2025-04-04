@@ -1,4 +1,4 @@
-import streamlit as st
+
 from utils.asc_data import get_asc_core_competencies
 from utils.career_matching import generate_career_matches_with_competencies
 
@@ -7,7 +7,8 @@ def render_competencies_assessment(st):
     Render the core competencies assessment interface.
 
     Args:
-        container: Streamlit container to render in
+        st:
+
     """
     with st.container():
         st.subheader("ASC Core Competencies")

@@ -1,5 +1,5 @@
 import math
-import networkx as nx
+import network as nx
 import random
 
 
