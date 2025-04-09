@@ -82,7 +82,7 @@ The system uses an agent-based architecture with specialized components:
 │   |
 │   ├── llm_service.py          # LLM integration service
 │   ├── resume_parser.py        # Resume parsing utilities
-│   ├── skills_extractor.py     # Skill extraction utilities
+│   |
 │   └── visualizer.py           # Visualization utilities
 └── app/                        # App interface components
     ├── app_structure.py        # Page layout
