@@ -79,7 +79,7 @@ The system uses an agent-based architecture with specialized components:
 │   ├── agents/                 # Agent system
 │   │   └── agent_manager.py    # Manages agent interactions
 │   ├── asc_data.py             # ASC dataset utilities
-│   ├── career_matching.py      # Career recommendation utilities
+│   |
 │   ├── llm_service.py          # LLM integration service
 │   ├── resume_parser.py        # Resume parsing utilities
 │   ├── skills_extractor.py     # Skill extraction utilities
