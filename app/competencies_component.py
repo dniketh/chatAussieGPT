@@ -1,6 +1,5 @@
 
 from utils.asc_data import get_asc_core_competencies
-from utils.career_matching import generate_career_matches_with_competencies
 
 def render_competencies_assessment(st):
     """
@@ -51,19 +50,4 @@ def render_competencies_assessment(st):
         if st.button("Submit Core Competency Ratings"):
             st.success("Core competency ratings saved! These will be considered in your career recommendations.")
 
-            # Now you can use the competencies in career matching
-            update_career_recommendations()
 
-
-def update_career_recommendations():
-    """Update career recommendations based on skills and competencies."""
-    # If no skills defined yet, use empty list
-    skills = st.session_state.get("skills", [])
-
-    # Get competencies with non-zero ratings
-    competencies = {
-        name: rating for name, rating in st.session_state.get("core_competencies_ratings", {}).items()
-        if rating > 0
-    }
-    # Update career matches in session state
-    st.session_state.career_matches = generate_career_matches_with_competencies(skills, competencies)

@@ -1,5 +1,5 @@
 import streamlit as st
-
+import os
 # Import app modules
 from app.app_structure import (
     setup_page_config,
@@ -9,7 +9,14 @@ from app.app_structure import (
 from app.chat_interface import render_chat_interface
 from app.sidebar_components import render_sidebar
 from app.competencies_component import render_competencies_assessment
+from utils.agents.agent_manager import AgentManager
 from utils.llm_service import initialize_model
+from dotenv import load_dotenv
+
+
+
+
+
 
 def initialize_session_state():
     """Initialize all session state variables."""
@@ -25,14 +32,29 @@ def initialize_session_state():
         st.session_state.conversation_stage = "initial"
     if "show_skills_map" not in st.session_state:
         st.session_state.show_skills_map = False
+    if "openai_api_key" not in st.session_state:
+        st.session_state.openai_api_key = ""
 
 
-# main.py (update main function)
+def initialize_knowledge_base():
+    """Initialize the ASC knowledge base if needed"""
+    # Check if the JSON file exists
+    json_kb_path = "data/asc_knowledge_base.json"
+    text_kb_path = "data/asc_knowledge_base.txt"
+
+    if os.path.exists(json_kb_path) and not os.path.exists(text_kb_path):
+        st.info("Converting ASC knowledge base from JSON to text format...")
+        agent_manager = AgentManager()
+        agent_manager._convert_json_to_text_kb(json_kb_path, text_kb_path)
+
+
+
 
 def main():
-    """Main entry point for the Career Guide AI application."""
+    """Main entry point"""
     # Initialize session state first
     initialize_session_state()
+
     initialize_model() # when we have the llm ready
     #Setup the application
     setup_page_config()
@@ -40,7 +62,7 @@ def main():
 
     # App header
     st.title("chatAussieGPT")
-    st.markdown("#### Discover your  career path based on your skills and interests")
+    st.markdown("#### Discover your career path in Australia based on your skills and interests")
 
     # Determine if we should show competencies assessment
     show_competencies = st.session_state.get("show_competencies", False)

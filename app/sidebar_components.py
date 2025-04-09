@@ -5,6 +5,8 @@ from utils.visualizer import create_simple_skills_visualization
 
 # app/sidebar_components.py (update render_sidebar function)
 
+# app/sidebar_components.py - update render_sidebar
+
 def render_sidebar(st):
     """
     Render the sidebar components in the provided container.
@@ -14,6 +16,9 @@ def render_sidebar(st):
     """
     with st.container():
         st.subheader("Quick Actions")
+
+        # API key input section
+        render_api_key_input()
 
         # Resume upload component
         render_resume_upload()
@@ -30,7 +35,44 @@ def render_sidebar(st):
             render_career_matches()
 
         # Quick prompt suggestions
-        render_prompt_suggestions()
+        #render_prompt_suggestions()
+
+
+def render_api_key_input():
+    """Render the OpenAI API key input section in the sidebar."""
+    with st.expander("API Key Settings", expanded=False):
+        st.info(
+            "Your API key is needed to use advanced features. It's stored only in your session and never saved on our servers.")
+
+        # Get current key from session state
+        current_key = st.session_state.get("openai_api_key", "")
+        mask_key = "•" * len(current_key) if current_key else ""
+
+        # Show masked key if exists
+        if current_key:
+            st.success(f"API Key set: {mask_key}")
+
+            # Add button to clear key
+            if st.button("Clear API Key"):
+                st.session_state.openai_api_key = ""
+                st.rerun()
+        else:
+            # Show input field for key
+            api_key = st.text_input("Enter OpenAI API Key", type="password")
+
+            if api_key:
+                # Validate key format (simple check)
+                if api_key.startswith("sk-") and len(api_key) > 20:
+                    st.session_state.openai_api_key = api_key
+                    st.success("API Key saved to session!")
+
+                    # Initialize the API client with the new key
+                    from utils.llm_service import initialize_model_with_key
+                    initialize_model_with_key(api_key)
+
+                    st.rerun()
+                else:
+                    st.error("Invalid API key format. Keys should start with 'sk-'")
 
 def render_resume_upload():
     """Render the resume upload component."""
@@ -108,10 +150,10 @@ def render_career_matches():
 
     if len(st.session_state.career_matches) > 3:
         st.button("View All Matches", key="view_all_matches")
-
+"""
 
 def render_prompt_suggestions():
-    """Render prompt suggestion buttons."""
+    
     st.subheader("Try asking:")
 
     # Create suggestion buttons
@@ -125,16 +167,14 @@ def render_prompt_suggestions():
     elif st.session_state.conversation_stage == "recommendations_provided":
         create_suggestion("What education do I need for this career?")
 
-
-
+"""
+###Future Implementation
+"""
 def create_suggestion(text):
-    """
-    Create a suggestion button that acts like user input.
-
-    Args:
-        text: The suggestion text
-    """
+   
     if st.button(text, key=f"suggestion_{text}", help=f"Click to ask: {text}"):
         # Add to messages and trigger rerun
         st.session_state.messages.append({"role": "user", "content": text})
         st.experimental_rerun()
+    
+"""
