@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Career Guide AI is a  Agentic career guidance system that uses the Australian Skills Classification (ASC) dataset to help users with career planning and job seeking. The system:
+chatAussieGPT is a  Agentic career guidance system that uses the Australian Skills Classification (ASC) dataset to help users with career planning and job seeking. The system:
 
 - Helps students assess how well their skills and passions align with potential careers
 - Supports job seekers in vertical and horizontal career growth
