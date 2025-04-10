@@ -36,7 +36,7 @@ The system uses an agent-based architecture with specialized components:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/career-guide-ai.git
+   git clone https://github.com/dniketh/chatAussieGPT.git
    cd career-guide-ai
    ```
 
@@ -58,7 +58,7 @@ The system uses an agent-based architecture with specialized components:
    streamlit run main.py
    ```
 
-2. Open your browser to the provided URL (typically http://localhost:8501)
+2. Open your browser to the provided URL (eg http://localhost:8501)
 
 3. Enter your OpenAI API key in the sidebar (required for advanced features)
 
