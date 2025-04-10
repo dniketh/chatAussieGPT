@@ -68,8 +68,8 @@ def extract_text_from_resume(uploaded_file):
 
 def extract_skills_from_resume(resume_text):
     """Extract skills from resume text"""
-    # Use the existing skill extractor
-    return extract_skills_from_text(resume_text)
+    ## Need to extract skills from the resume text here.
+    return None
 
 
 def clean_text(text):
