@@ -7,13 +7,28 @@ import os
 import asyncio
 
 
+@function_tool()
+def get_user_profile() -> str:
+    """Get user skills and competencies from session state."""
+    skills = st.session_state.get("skills", [])
+    resume_skills = st.session_state.get("resume_skills", [])
+    competencies = st.session_state.get("core_competencies_ratings", {})
+
+    # Format as a human-readable string
+    profile_text = "User Profile:\n"
+    profile_text += f"- Skills: {', '.join(skills)}\n"
+    profile_text += f"- Resume Skills: {', '.join(resume_skills)}\n"
+    profile_text += "- Core Competencies:\n"
+    for comp, rating in competencies.items():
+        profile_text += f"  - {comp}: {rating}/5\n"
+    return profile_text
 
 
 class AgentManager:
     def __init__(self, api_key=None):
         """Initialize the agent manager"""
         self.api_key = api_key
-        
+
         if api_key:
             os.environ["OPENAI_API_KEY"] = api_key
         self.client = None
@@ -26,7 +41,6 @@ class AgentManager:
         if not self.api_key:
             st.error("OpenAI API key must be provided to use this functionality")
             return None
-
 
         if not self.client:
             try:
@@ -48,7 +62,6 @@ class AgentManager:
 
         if self.triage_agent:
             return self.triage_agent
-
 
         try:
             self.agents["asc_retrieval"] = self._create_asc_retrieval_agent()
@@ -92,10 +105,9 @@ class AgentManager:
             Be precise, informative, and helpful in your recommendations.
             """,
             tools=[
-                self._get_user_profile_tool,
+                get_user_profile,
                 retrieval_tool
             ]
-      
 
         )
 
@@ -121,10 +133,9 @@ class AgentManager:
             Be practical, specific, and helpful in your recommendations.
             """,
             tools=[
-                self._get_user_profile_tool,
+                get_user_profile,
                 WebSearchTool()
             ]
-
 
         )
 
@@ -158,8 +169,7 @@ class AgentManager:
             Maintain a conversational and helpful tone throughout the interaction.
             """,
             handoffs=specialized_agents,
-            tools=[self._get_user_profile_tool]
-           
+            tools=[get_user_profile]
 
         )
 
@@ -184,31 +194,6 @@ class AgentManager:
                 st.session_state["kb_file_id"] = file_id
 
         return FileSearchTool(max_num_results=5, include_search_results=True, vector_store_ids=[file_id])
-
-    @function_tool(
-        name_override="_get_user_profile_tool",
-        description_override="Get user skills and competencies from session state.",
-        docstring_style="google"
-    )
-
-    def _get_user_profile_tool(self) -> str:
-         """Get user skills and competencies from session state."""
-         skills = st.session_state.get("skills", [])
-         resume_skills = st.session_state.get("resume_skills", [])
-         competencies = st.session_state.get("core_competencies_ratings", {})
-
-         # Format as a human-readable string
-         profile_text = "User Profile:\n"
-         profile_text += f"- Skills: {', '.join(skills)}\n"
-         profile_text += f"- Resume Skills: {', '.join(resume_skills)}\n"
-         profile_text += "- Core Competencies:\n"
-         for comp, rating in competencies.items():
-             profile_text += f"  - {comp}: {rating}/5\n"
-         return profile_text
-
-
-
-
 
     @staticmethod
     def _convert_json_to_text_kb(json_path, output_path):
@@ -300,4 +285,8 @@ class AgentManager:
         except Exception as e:
             error_msg = str(e)
             print(f"Error in process_user_query: {error_msg}")
+
+            if "insufficient_quota" in error_msg or "exceeded your current quota" in error_msg:
+                return "Sorry, I can't process your request right now. The OpenAI API quota has been reached. Please try again later or update your API key in the settings. If you're using a free tier account, you may need to add payment information to continue."
+
             return f"I encountered an issue while processing your request: {error_msg}"
