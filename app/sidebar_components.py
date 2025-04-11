@@ -42,7 +42,7 @@ def render_api_key_input():
     """Render the OpenAI API key input section in the sidebar."""
     with st.expander("API Key Settings", expanded=False):
         st.info(
-            "Your API key is needed to use advanced features. It's stored only in your session and never saved on our servers.")
+            "Your API key is needed to use the features. It's stored only in your session and never saved on our servers.")
 
         # Get current key from session state
         current_key = st.session_state.get("openai_api_key", "")
@@ -65,11 +65,6 @@ def render_api_key_input():
                 if api_key.startswith("sk-") and len(api_key) > 20:
                     st.session_state.openai_api_key = api_key
                     st.success("API Key saved to session!")
-
-                    # Initialize the API client with the new key
-                    from utils.llm_service import initialize_model_with_key
-                    initialize_model_with_key(api_key)
-
                     st.rerun()
                 else:
                     st.error("Invalid API key format. Keys should start with 'sk-'")
