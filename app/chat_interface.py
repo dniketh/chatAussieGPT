@@ -38,7 +38,7 @@ def process_user_input(user_input):
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    with st.spinner("Checking..."):
+    with st.spinner(".."):
 
         response = generate_response(user_input)
 
