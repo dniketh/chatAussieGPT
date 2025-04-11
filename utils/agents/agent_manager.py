@@ -14,7 +14,7 @@ def get_user_profile() -> str:
     resume_skills = st.session_state.get("resume_skills", [])
     competencies = st.session_state.get("core_competencies_ratings", {})
 
-    # Format as a human-readable string
+
     profile_text = "User Profile:\n"
     profile_text += f"- Skills: {', '.join(skills)}\n"
     profile_text += f"- Resume Skills: {', '.join(resume_skills)}\n"
