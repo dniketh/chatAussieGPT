@@ -5,7 +5,7 @@ import streamlit as st
 import json
 import os
 import asyncio
-
+import concurrent.futures
 
 @function_tool()
 def get_user_profile() -> str:
@@ -111,7 +111,8 @@ class AgentManager:
 
         )
 
-    def _create_job_search_agent(self):
+    @staticmethod
+    def _create_job_search_agent():
         return Agent(
             name="Job Search Assistant",
             model="gpt-4o",
@@ -139,7 +140,8 @@ class AgentManager:
 
         )
 
-    def _create_triage_agent(self, specialized_agents):
+    @staticmethod
+    def _create_triage_agent(specialized_agents):
         """Create the main triage agent"""
         return Agent(
             name="Career Guide for ASC",
@@ -246,7 +248,7 @@ class AgentManager:
 
     def process_user_query(self, user_query):
         """
-        Process user query through the agent system
+        Process user query through the agent system and return the response.
 
         Args:
             user_query: User's input text
@@ -254,6 +256,46 @@ class AgentManager:
         Returns:
             str: Generated response
         """
+        # Set environment variable
+        os.environ["OPENAI_API_KEY"] = self.api_key
+
+        # Check agent initialization
+        if not self.triage_agent:
+            if not self.initialize_agents():
+                return "I couldn't initialize the career guidance system. Please check your API key in the sidebar."
+
+        # Ensure client is initialized
+        if not self._ensure_client():
+            return "Error: Unable to process your request. Please make sure you've entered a valid OpenAI API key in the sidebar."
+
+        # Define a function that will execute the async code and return the result
+        def run_async_in_thread():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(
+                    Runner.run(
+                        starting_agent=self.triage_agent,
+                        input=user_query
+                    )
+                )
+                return result.final_output
+            except Exception as e:
+                error_msg = str(e)
+                print(f"Error in thread: {error_msg}")
+                if "insufficient_quota" in error_msg:
+                    return "Sorry, I can't process your request right now. The API quota has been reached. Please update your API key in settings or try again later."
+                return f"I encountered an issue while processing your request: {error_msg}"
+            finally:
+                loop.close()
+
+        # Use ThreadPoolExecutor to run the function and get its return value directly
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_async_in_thread)
+            return future.result()
+    """
+    def process_user_query(self, user_query):
+       
         # Always re-check environment variable before processing
         os.environ["OPENAI_API_KEY"] = self.api_key
 
@@ -290,3 +332,5 @@ class AgentManager:
                 return "Sorry, I can't process your request right now. The OpenAI API quota has been reached. Please try again later or update your API key in the settings. If you're using a free tier account, you may need to add payment information to continue."
 
             return f"I encountered an issue while processing your request: {error_msg}"
+        
+        """
