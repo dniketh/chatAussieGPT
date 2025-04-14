@@ -2,11 +2,6 @@ import streamlit as st
 from utils.resume_parser import extract_text_from_resume, extract_skills_from_resume
 from utils.visualizer import create_simple_skills_visualization
 
-
-# app/sidebar_components.py (update render_sidebar function)
-
-# app/sidebar_components.py - update render_sidebar
-
 def render_sidebar(st):
     """
     Render the sidebar components in the provided container.
@@ -35,7 +30,7 @@ def render_sidebar(st):
             render_career_matches()
 
         # Quick prompt suggestions
-        #render_prompt_suggestions()
+        render_prompt_suggestions()
 
 
 def render_api_key_input():
@@ -69,6 +64,7 @@ def render_api_key_input():
                 else:
                     st.error("Invalid API key format. Keys should start with 'sk-'")
 
+
 def render_resume_upload():
     """Render the resume upload component."""
     uploaded_file = st.file_uploader("Upload your resume", type=["pdf", "docx"])
@@ -78,30 +74,39 @@ def render_resume_upload():
             # Extract text from resume
             resume_text = extract_text_from_resume(uploaded_file)
 
-            # Extract skills from resume text
-            resume_skills = extract_skills_from_resume(resume_text)
+            # Ensure the API key is available
+            api_key = st.session_state.get("openai_api_key", "")
 
-            # Update skills list
-            new_skills_count = 0
-            for skill in resume_skills:
-                if skill not in st.session_state.skills:
-                    st.session_state.skills.append(skill)
-                    new_skills_count += 1
+            if api_key:
+                # Extract skills from resume text
+                resume_skills = extract_skills_from_resume(resume_text, api_key)
+            else:
+                resume_skills = []
 
-            # Confirm to user
-            st.success(f"Found {len(resume_skills)} skills in your resume! ({new_skills_count} new)")
+            if resume_skills:  # Only proceed if skills were extracted
+                # Update skills list
+                new_skills_count = 0
+                for skill in resume_skills:
+                    if skill not in st.session_state.skills:
+                        st.session_state.skills.append(skill)
+                        new_skills_count += 1
 
-            # Add message to chat if conversation just started
-            if len(st.session_state.messages) <= 2:
-                skill_list = resume_skills[:5]
-                skill_message = f"Based on your resume, I can see you have skills in: {', '.join(skill_list)}"
-                if len(resume_skills) > 5:
-                    skill_message += f" and {len(resume_skills) - 5} more."
+                # Confirm to user
+                st.success(f"Found {len(resume_skills)} skills in your resume! ({new_skills_count} new)")
 
-                recommendation_message = "What kind of career are you interested in exploring?"
+                # Add message to chat if conversation just started
+                if len(st.session_state.messages) <= 2:
+                    skill_list = resume_skills[:5]
+                    skill_message = f"Based on your resume, I can see you have skills in: {', '.join(skill_list)}"
+                    if len(resume_skills) > 5:
+                        skill_message += f" and {len(resume_skills) - 5} more."
 
-                full_message = f"{skill_message}\n\n{recommendation_message}"
-                st.session_state.messages.append({"role": "assistant", "content": full_message})
+                    recommendation_message = "What kind of career are you interested in exploring?"
+
+                    full_message = f"{skill_message}\n\n{recommendation_message}"
+                    st.session_state.messages.append({"role": "assistant", "content": full_message})
+            else:
+                st.warning("No skills could be extracted from the resume. Try uploading a different file or check formatting.")
 
 
 def render_skills_display():
@@ -109,12 +114,27 @@ def render_skills_display():
     st.subheader("Your Skills")
 
     if st.session_state.skills:
-        # Create a layout for skills as tags
-        skills_html = "<div style='display: flex; flex-wrap: wrap;'>"
+        # Add inline CSS to change text color of skills to black
+        skills_html = """
+        <style>
+            .skill-tag {
+                background-color: #f1f1f1;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 5px 10px;
+                margin: 5px;
+                color: black; /* Change text color to black */
+            }
+        </style>
+        <div style='display: flex; flex-wrap: wrap;'>
+        """
+        
+        # Loop over each skill and generate the HTML tags
         for skill in st.session_state.skills:
             skills_html += f"<div class='skill-tag'>{skill}</div>"
         skills_html += "</div>"
 
+        # Render the skills with custom CSS
         st.markdown(skills_html, unsafe_allow_html=True)
 
         # Add a button to visualize skills
@@ -127,8 +147,12 @@ def render_skills_display():
     if st.session_state.show_skills_map and st.session_state.skills:
         st.subheader("Skills Map")
         # Generate a simple visual representation of skills
-        viz_html = create_simple_skills_visualization(st.session_state.skills)
-        st.components.v1.html(viz_html, height=400)
+        api_key = st.session_state.get("openai_api_key", "")
+        viz_html = create_simple_skills_visualization(st.session_state.skills, api_key)
+        viz_height = viz_html.count('<circle') * 100 + 400  # Rough estimate
+
+        st.components.v1.html(viz_html, height=viz_height)
+        #st.components.v1.html(viz_html, height=1000)
 
 
 def render_career_matches():
@@ -145,10 +169,10 @@ def render_career_matches():
 
     if len(st.session_state.career_matches) > 3:
         st.button("View All Matches", key="view_all_matches")
-"""
+
 
 def render_prompt_suggestions():
-    
+    """Render prompt suggestions."""
     st.subheader("Try asking:")
 
     # Create suggestion buttons
@@ -162,14 +186,10 @@ def render_prompt_suggestions():
     elif st.session_state.conversation_stage == "recommendations_provided":
         create_suggestion("What education do I need for this career?")
 
-"""
-###Future Implementation
-"""
+
 def create_suggestion(text):
-   
+    """Create prompt suggestion button."""
     if st.button(text, key=f"suggestion_{text}", help=f"Click to ask: {text}"):
         # Add to messages and trigger rerun
         st.session_state.messages.append({"role": "user", "content": text})
         st.experimental_rerun()
-    
-"""
