@@ -1,12 +1,9 @@
-
 from utils.asc_data import get_asc_core_competencies
+from utils.supabase_data_utils import save_user_competencies
 
-def render_competencies_assessment(st):
+def render_competencies_assessment(st, supabase, user):
     """
     Render the core competencies assessment interface.
-
-    Args:
-        st:
 
     """
     with st.container():
@@ -48,6 +45,7 @@ def render_competencies_assessment(st):
 
         # Button to submit ratings
         if st.button("Submit Core Competency Ratings"):
+            save_user_competencies(supabase, user, st.session_state.core_competencies_ratings)
             st.success("Core competency ratings saved! These will be considered in your career recommendations.")
 
 

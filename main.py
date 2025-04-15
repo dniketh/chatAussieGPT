@@ -1,19 +1,29 @@
 import streamlit as st
-import os
-# Import app modules
 from app.app_structure import (
     setup_page_config,
-    apply_custom_css,
-    get_layout
+    apply_custom_css
 )
 from app.chat_interface import render_chat_interface
 from app.sidebar_components import render_sidebar
 from app.competencies_component import render_competencies_assessment
+from supabase import create_client
 
 
+setup_page_config()
 
 
-
+@st.cache_resource
+def init_supabase_connection():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    try:
+        client = create_client(url, key)
+        st.success("Connected to Supabase!")
+        return client
+    except Exception as e:
+        st.error(f"Supabase connection failed: {e}")
+        return None
+supabase = init_supabase_connection()
 
 
 
@@ -40,35 +50,96 @@ def initialize_session_state():
 
 
 def main():
-    """Main entry point"""
-    # Initialize session state first
     initialize_session_state()
-    setup_page_config()
     apply_custom_css()
 
-    # App header
-    st.title("chatAussieGPT")
-    st.markdown("#### Discover your career path in Australia based on your skills and interests")
+    if not supabase:
+         st.error("Database connection failed. Please check secrets or Supabase status.")
+         return
+    try:
+        session = supabase.auth.get_session() # Check for existing session
+        user_response = supabase.auth.get_user() if session else None
+    except Exception as e:
+        st.error(f"Error checking Supabase session: {e}")
+        user_response = None
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": "Discover your career path in Australia based on your skills and interests"}]
 
-    # Determine if we should show competencies assessment
-    show_competencies = st.session_state.get("show_competencies", False)
+    if not user_response:
+        # --- Not Logged In: Show Login/Register ---
+        st.title("Welcome to chatAussieGPT")
+        st.markdown("#### Log in or register to continue")
 
-    if show_competencies:
-        # Render competencies assessment
-        render_competencies_assessment(st)
+        choice = st.radio("Select Action", ["Login", "Register"], horizontal=True)
 
-        # Add button to return to main view
-        if st.button("Back to Main View"):
-            st.session_state.show_competencies = False
-            st.experimental_rerun()
+        if choice == "Login":
+            with st.form("login_form"):
+                email = st.text_input("Email")
+                password = st.text_input("Password", type="password")
+                submitted = st.form_submit_button("Login")
+                if submitted:
+                    try:
+                        session = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        st.success("Login successful!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Login failed: {e}")
+
+        elif choice == "Register":
+             with st.form("register_form"):
+                name = st.text_input("Your Name") # Optional, for profile
+                email = st.text_input("Email")
+                password = st.text_input("Password", type="password")
+                password_confirm = st.text_input("Confirm Password", type="password")
+                submitted = st.form_submit_button("Register")
+                if submitted:
+                    if not all([name, email, password, password_confirm]):
+                         st.warning("Please fill all fields.")
+                    elif password != password_confirm:
+                         st.error("Passwords do not match.")
+                    elif len(password) < 8:
+                        st.warning("Password must be at least 8 characters.")
+                    else:
+                         try:
+                             res = supabase.auth.sign_up({
+                                 "email": email,
+                                 "password": password,
+                                 "options": {
+                                     "data": {
+                                         'name': name
+                                     }
+                                 }
+                             })
+                             st.success("Registration successful! Check your email for verification (if enabled). Please log in.")
+                         except Exception as e:
+                             st.error(f"Registration failed: {e}")
+
     else:
-        # Render chat interface
-        render_chat_interface(st)
+        st.session_state['user'] = user_response
+        user = user_response.user
+        user_name = user.user_metadata.get('name', user.email)
+        st.title("chatAussieGPT")
+        st.markdown(f"#### Welcome, {user_name}!")
 
-        # Render sidebar
+        show_competencies = st.session_state.get("show_competencies", False)
+
+        if show_competencies:
+            render_competencies_assessment(st, supabase, user)
+            if st.button("Back to Chat"):
+                st.session_state.show_competencies = False
+                st.rerun()
+        else:
+            render_chat_interface(supabase, user)
+
+
         with st.sidebar:
-            render_sidebar(st)
-
+             st.write(f"Logged in as: {user_name}")
+             if st.button("Logout"):
+                  supabase.auth.sign_out()
+                  st.session_state.pop('user', None)
+                  st.rerun()
+             st.divider()
+             render_sidebar(supabase, user)
 
 if __name__ == "__main__":
     main()
