@@ -3,16 +3,11 @@ from utils.resume_parser import extract_text_from_resume, extract_skills_from_re
 from utils.visualizer import create_simple_skills_visualization
 
 
-# app/sidebar_components.py (update render_sidebar function)
-
-# app/sidebar_components.py - update render_sidebar
-
-def render_sidebar(st):
+def render_sidebar(supabase, user_id):
     """
     Render the sidebar components in the provided container.
 
-    Args:
-        st: Streamlit container to render in
+
     """
     with st.container():
         st.subheader("Quick Actions")
@@ -21,7 +16,7 @@ def render_sidebar(st):
         render_api_key_input()
 
         # Resume upload component
-        render_resume_upload()
+        render_resume_upload(supabase,user_id)
 
         # Add link to core competencies assessment
         if st.button("Assess Core Competencies (ASC)"):
@@ -30,12 +25,6 @@ def render_sidebar(st):
         # Skills display component
         render_skills_display()
 
-        # Career matches component (if available)
-        if st.session_state.career_matches:
-            render_career_matches()
-
-        # Quick prompt suggestions
-        #render_prompt_suggestions()
 
 
 def render_api_key_input():
@@ -69,7 +58,7 @@ def render_api_key_input():
                 else:
                     st.error("Invalid API key format. Keys should start with 'sk-'")
 
-def render_resume_upload():
+def render_resume_upload(supabase, user_id):
     """Render the resume upload component."""
     uploaded_file = st.file_uploader("Upload your resume", type=["pdf", "docx"])
 
@@ -130,21 +119,6 @@ def render_skills_display():
         viz_html = create_simple_skills_visualization(st.session_state.skills)
         st.components.v1.html(viz_html, height=400)
 
-
-def render_career_matches():
-    """Render the career matches component."""
-    st.subheader("Career Matches")
-    for i, match in enumerate(st.session_state.career_matches[:3]):
-        with st.container():
-            st.markdown(f"""
-            <div class='career-card'>
-                <h4>{match['title']}</h4>
-                <p><strong>Match:</strong> {match['match_score']}%</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-    if len(st.session_state.career_matches) > 3:
-        st.button("View All Matches", key="view_all_matches")
 """
 
 def render_prompt_suggestions():

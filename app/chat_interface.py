@@ -2,7 +2,7 @@ import streamlit as st
 from utils.llm_service import generate_response
 
 
-def render_chat_interface(st):
+def render_chat_interface(supabase, user):
     """
     Render the chat interface in the provided container.
 
@@ -23,10 +23,10 @@ def render_chat_interface(st):
     user_input = st.chat_input("Tell me about your skills or ask about career options...")
 
     if user_input:
-        process_user_input(user_input)
+        process_user_input(supabase, user, user_input)
 
 
-def process_user_input(user_input):
+def process_user_input(supabase, user, user_input):
     """
     Process user input from the chat interface.
 
@@ -40,7 +40,7 @@ def process_user_input(user_input):
 
     with st.spinner(".."):
 
-        response = generate_response(user_input)
+        response = generate_response(supabase, user, user_input)
 
         st.session_state.messages.append({"role": "assistant", "content": response})
 

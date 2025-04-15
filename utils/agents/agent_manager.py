@@ -1,31 +1,16 @@
 # utils/agents/agent_manager.py
 from openai import OpenAI
-from agents import Agent, Runner, function_tool, FileSearchTool, WebSearchTool
+from agents import Agent, Runner, function_tool, FileSearchTool, WebSearchTool, RunContextWrapper
 import streamlit as st
 import json
 import os
 import asyncio
 import concurrent.futures
-
-@function_tool()
-def get_user_profile() -> str:
-    """Get user skills and competencies from session state."""
-    skills = st.session_state.get("skills", [])
-    resume_skills = st.session_state.get("resume_skills", [])
-    competencies = st.session_state.get("core_competencies_ratings", {})
-
-
-    profile_text = "User Profile:\n"
-    profile_text += f"- Skills: {', '.join(skills)}\n"
-    profile_text += f"- Resume Skills: {', '.join(resume_skills)}\n"
-    profile_text += "- Core Competencies:\n"
-    for comp, rating in competencies.items():
-        profile_text += f"  - {comp}: {rating}/5\n"
-    return profile_text
+from utils.supabase_data_utils import get_user_skills, get_user_competencies
 
 
 class AgentManager:
-    def __init__(self, api_key=None):
+    def __init__(self, api_key=None, supabase = None, user =None):
         """Initialize the agent manager"""
         self.api_key = api_key
 
@@ -34,10 +19,41 @@ class AgentManager:
         self.client = None
         self.triage_agent = None
         self.agents = {}
+        self.supabase_client =  supabase
+        self.user = user
+
+
+
+
+    def get_user_profile(self, context: RunContextWrapper) -> str:
+        """Get user skills and competencies from the  database."""
+        profile_text = "User Profile Data:\n"
+        skills = []
+        competencies = {}
+
+        if not self.supabase_client or not self.user:
+            return "Error: Unable to access user database context."
+
+        try:
+            skills = get_user_skills(self.supabase_client, self.user)
+            competencies = get_user_competencies(self.supabase_client, self.user)
+
+            profile_text += f"- Skills: {', '.join(skills) if skills else 'No skills found.'}\n"
+            profile_text += "- Core Competencies:\n"
+            if competencies:
+                for comp, rating in competencies.items():
+                    profile_text += f"  - {comp}: {rating}/5\n"
+            else:
+                profile_text += "  No competency ratings found.\n"
+
+        except Exception as e:
+            print(f"Error fetching profile data from Supabase: {e}")
+            profile_text += "Error fetching profile data."
+
+        return profile_text
 
     def _ensure_client(self):
         """Ensure the OpenAI client is initialized with the API key"""
-        # Check if we have a valid API key
         if not self.api_key:
             st.error("OpenAI API key must be provided to use this functionality")
             return None
@@ -56,7 +72,6 @@ class AgentManager:
 
     def initialize_agents(self):
         """Initialize all agents in the system"""
-        # Ensure client is initialized before creating agents
         if not self._ensure_client():
             return None
 
@@ -105,14 +120,14 @@ class AgentManager:
             Be precise, informative, and helpful in your recommendations.
             """,
             tools=[
-                get_user_profile,
+                function_tool(self.get_user_profile),
                 retrieval_tool
             ]
 
         )
 
-    @staticmethod
-    def _create_job_search_agent():
+
+    def _create_job_search_agent(self):
         return Agent(
             name="Job Search Assistant",
             model="gpt-4o",
@@ -127,6 +142,7 @@ class AgentManager:
             - Provide specific job titles, companies, and key requirements
             - Focus on jobs that match the user's skill profile
             - Offer practical advice about job application strategies
+            - Share information on interview preparation for specific companies if the user asks
             - Be honest about the current job market conditions
 
             Use web search to find current job opportunities and market information.
@@ -134,14 +150,14 @@ class AgentManager:
             Be practical, specific, and helpful in your recommendations.
             """,
             tools=[
-                get_user_profile,
+                self.get_user_profile,
                 WebSearchTool()
             ]
 
         )
 
-    @staticmethod
-    def _create_triage_agent(specialized_agents):
+
+    def _create_triage_agent(self, specialized_agents):
         """Create the main triage agent"""
         return Agent(
             name="Career Guide for ASC",
@@ -154,7 +170,7 @@ class AgentManager:
             1. ASC Career Recommendations - Use this agent when:
                - Users want career recommendations based on their skills
                - Questions relate to the Australian Skills Classification system
-               - Users want to know which careers match their competencies
+               - Users want to know which careers match their competencies and skils
                - Queries are about career paths, requirements, or qualifications
 
             2. Job Search Assistant - Use this agent when:
@@ -162,6 +178,7 @@ class AgentManager:
                - Questions are about current job market conditions
                - Users want to know which companies are hiring
                - Queries are about job application advice
+               - Queries that seek advice on interview preparation for specific companies 
 
             For general questions, answer directly without using specialized agents.
 
@@ -171,7 +188,7 @@ class AgentManager:
             Maintain a conversational and helpful tone throughout the interaction.
             """,
             handoffs=specialized_agents,
-            tools=[get_user_profile]
+            tools=[function_tool(self.get_user_profile)]
 
         )
 
@@ -256,19 +273,15 @@ class AgentManager:
         Returns:
             str: Generated response
         """
-        # Set environment variable
         os.environ["OPENAI_API_KEY"] = self.api_key
 
-        # Check agent initialization
         if not self.triage_agent:
             if not self.initialize_agents():
                 return "I couldn't initialize the career guidance system. Please check your API key in the sidebar."
 
-        # Ensure client is initialized
         if not self._ensure_client():
             return "Error: Unable to process your request. Please make sure you've entered a valid OpenAI API key in the sidebar."
 
-        # Define a function that will execute the async code and return the result
         def run_async_in_thread():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -289,48 +302,6 @@ class AgentManager:
             finally:
                 loop.close()
 
-        # Use ThreadPoolExecutor to run the function and get its return value directly
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(run_async_in_thread)
             return future.result()
-    """
-    def process_user_query(self, user_query):
-       
-        # Always re-check environment variable before processing
-        os.environ["OPENAI_API_KEY"] = self.api_key
-
-        if not self.triage_agent:
-            if not self.initialize_agents():
-                return "I couldn't initialize the career guidance system. Please check your API key in the sidebar."
-
-        # Double-check the client is initialized
-        if not self._ensure_client():
-            return "Error: Unable to process your request. Please make sure you've entered a valid OpenAI API key in the sidebar."
-
-        try:
-            # Create a new Runner with the API key
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            # Try to run with explicit API key
-            output = loop.run_until_complete(
-                Runner.run_sync(
-                    starting_agent=self.triage_agent,
-                    input=user_query
-
-                )
-            )
-            return output.final_output
-        except Exception as e:
-            error_msg = str(e)
-            print(f"Error in process_user_query: {error_msg}")
-
-            if "insufficient_quota" in error_msg or "exceeded your current quota" in error_msg:
-                return "Sorry, I can't process your request right now. The OpenAI API quota has been reached. Please try again later or update your API key in the settings. If you're using a free tier account, you may need to add payment information to continue."
-
-            return f"I encountered an issue while processing your request: {error_msg}"
-        
-        """
