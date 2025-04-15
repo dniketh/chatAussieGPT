@@ -7,15 +7,17 @@ from app.chat_interface import render_chat_interface
 from app.sidebar_components import render_sidebar
 from app.competencies_component import render_competencies_assessment
 from supabase import create_client
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 setup_page_config()
 
 
 @st.cache_resource
 def init_supabase_connection():
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
     try:
         client = create_client(url, key)
         st.success("Connected to Supabase!")
@@ -57,7 +59,7 @@ def main():
          st.error("Database connection failed. Please check secrets or Supabase status.")
          return
     try:
-        session = supabase.auth.get_session() # Check for existing session
+        session = supabase.auth.get_session()
         user_response = supabase.auth.get_user() if session else None
     except Exception as e:
         st.error(f"Error checking Supabase session: {e}")
@@ -66,7 +68,6 @@ def main():
         st.session_state.messages = [{"role": "assistant", "content": "Discover your career path in Australia based on your skills and interests"}]
 
     if not user_response:
-        # --- Not Logged In: Show Login/Register ---
         st.title("Welcome to chatAussieGPT")
         st.markdown("#### Log in or register to continue")
 
