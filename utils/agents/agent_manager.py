@@ -1,12 +1,15 @@
 # utils/agents/agent_manager.py
 from openai import OpenAI
-from agents import Agent, Runner, function_tool, FileSearchTool, WebSearchTool, RunContextWrapper
+from agents import Agent, Runner, function_tool, FileSearchTool, WebSearchTool, RunContextWrapper,enable_verbose_stdout_logging
+
 import streamlit as st
 import json
 import os
 import asyncio
 import concurrent.futures
 from utils.supabase_data_utils import get_user_skills, get_user_competencies
+
+enable_verbose_stdout_logging()
 
 
 class AgentManager:
@@ -74,6 +77,7 @@ class AgentManager:
         """Initialize all agents in the system"""
         if not self._ensure_client():
             return None
+        self.set_asc_vector_store()
 
         if self.triage_agent:
             return self.triage_agent
@@ -97,7 +101,7 @@ class AgentManager:
 
     def _create_asc_retrieval_agent(self):
         """Create agent for ASC knowledge retrieval"""
-        retrieval_tool = self._get_asc_retrieval_tool()
+
 
         return Agent(
             name="ASC Career Recommendations",
@@ -121,7 +125,7 @@ class AgentManager:
             """,
             tools=[
                 function_tool(self.get_user_profile),
-                retrieval_tool
+                FileSearchTool(vector_store_ids=[st.session_state.vector_store.id])
             ]
 
         )
@@ -132,7 +136,7 @@ class AgentManager:
             name="Job Search Assistant",
             model="gpt-4o",
             instructions="""
-            You are a specialized agent for finding current job opportunities.
+            You are a specialized agent for finding current job opportunities based on user's skills.
 
             Your purpose is to search for and provide information about actual job openings that match 
             the user's skills and interests.
@@ -144,13 +148,14 @@ class AgentManager:
             - Offer practical advice about job application strategies
             - Share information on interview preparation for specific companies if the user asks
             - Be honest about the current job market conditions
-
-            Use web search to find current job opportunities and market information.
-
+            
+            Use get_user_profile to get user skill details
+            Use web search to find current job opportunities and market information from sites like linkedIn, Seek, Indeed etc.
+             
             Be practical, specific, and helpful in your recommendations.
             """,
             tools=[
-                self.get_user_profile,
+                function_tool(self.get_user_profile),
                 WebSearchTool()
             ]
 
@@ -192,27 +197,67 @@ class AgentManager:
 
         )
 
-    def _get_asc_retrieval_tool(self):
-        """Get retrieval tool for ASC knowledge base"""
+    def set_asc_vector_store(self):
+        """Setting ASC knowledge base"""
+        print("In set_asc_vector_store ")
+
         if not self._ensure_client():
             return None
 
-        file_id = st.session_state.get("kb_file_id")
+        vector_store = st.session_state.get("vector_store", None)
 
-        if not file_id:
-            kb_text_path = "data/asc_knowledge_base.txt"
-            if not os.path.exists(kb_text_path):
-                self._convert_json_to_text_kb("data/asc_knowledge_base.json", kb_text_path)
+        try:
+            if not vector_store:
+                print("Checking vector stores... ")
+                vector_stores = self.client.vector_stores.list()
 
-            with open(kb_text_path, "rb") as file:
-                response = self.client.files.create(
-                    file=file,
-                    purpose="assistants"
-                )
-                file_id = response.id
-                st.session_state["kb_file_id"] = file_id
+                if vector_stores and vector_stores.data:
+                    print("Vector Stores Present... ")
+                    for vs in vector_stores.data:
+                        if vs.name == 'ASC Knowledge Base':
+                            print("ASC Knowledge Base Vector Found.")
+                            vector_store = vs
+                            st.session_state["vector_store"] = vector_store
+                            break
 
-        return FileSearchTool(max_num_results=5, include_search_results=True, vector_store_ids=[file_id])
+                if not vector_store:
+                    print("No existing ASC vector store found. Creating new one...")
+                    vector_store = self.client.vector_stores.create(name="ASC Knowledge Base")
+                    st.session_state["vector_store"] = vector_store
+                    print(f"Created vector store with ID: {vector_store.id}")
+
+            # Ensure local reference
+            vector_store = st.session_state["vector_store"]
+
+
+            existing_files = self.client.vector_stores.files.list(vector_store_id=vector_store.id)
+            print("Existing Files in Vector Store  - ",existing_files)
+
+            if existing_files and existing_files.data:
+                print(f"Vector store already has {len(existing_files.data)} file(s). Skipping upload.")
+            else:
+                print("No files found in vector store. Uploading...")
+                kb_text_path = "data/asc_knowledge_base.txt"
+                if not os.path.exists(kb_text_path):
+                    self._convert_json_to_text_kb("data/asc_knowledge_base.json", kb_text_path)
+
+                with open(kb_text_path, "rb") as file:
+                    print("Uploading ASC Data to OpenAI Vector Store:", vector_store.name)
+                    file_batch = self.client.vector_stores.file_batches.upload_and_poll(
+                        vector_store_id=vector_store.id,
+                        files=[file]
+                    )
+                    print(file_batch.status)
+                    print(file_batch.file_counts)
+
+        except Exception as e:
+            print(f"Error creating/checking for vector store: {e}")
+            st.error(f"Failed to create/check vector store: {str(e)}")
+            return None
+
+
+
+
 
     @staticmethod
     def _convert_json_to_text_kb(json_path, output_path):

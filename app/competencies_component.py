@@ -33,7 +33,7 @@ def render_competencies_assessment(st, supabase, user):
                 rating = st.slider(
                     f"Rate your {comp_name}",
                     min_value=0,
-                    max_value=5,
+                    max_value=10,
                     value=current_rating,
                     step=1,
                     help="0 = Not applicable, 1 = Beginner, 5 = Expert",
