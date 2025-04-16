@@ -1,5 +1,5 @@
 .git
 __pycache__
 *.pyc
-venv
+.venv
 .streamlit/secrets.toml
