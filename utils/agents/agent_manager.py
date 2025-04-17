@@ -231,47 +231,63 @@ class AgentManager:
             # Ensure local reference
             vector_store = st.session_state["vector_store"]
 
-
+            # Check if files already exist in the vector store
             existing_files = self.client.vector_stores.files.list(vector_store_id=vector_store.id)
-            print("Existing Files in Vector Store  - ",existing_files)
+            print("Existing Files in Vector Store  - ", existing_files)
 
-            if existing_files and len(existing_files.data) > 2:
-                print(f"Vector store already has more than {len(existing_files.data)} file(s). Skipping upload.")
-            else:
-                print("No files found in vector store. Uploading...")
+            # Flag file to track if upload has already been done
+            flag_file = 'upload_done.flag'
+
+            # If the flag file exists, we skip the upload process
+            if os.path.exists(flag_file):
+                print("Upload has already been done before. Skipping upload.")
+                return
+
+            # If not, proceed with the upload
+            if not existing_files or len(existing_files.data) <= 2:
+                print("No files found or less than 3 files found in vector store. Uploading...")
 
                 kb_text_path = 'data/files'
                 os.makedirs(kb_text_path, exist_ok=True)
+
+                # Convert JSON to text files if not already done
                 if not os.path.exists(kb_text_path) or not any(
                         os.path.isfile(os.path.join(kb_text_path, f)) for f in os.listdir(kb_text_path)):
                     print("Converting JSON to text files...")
                     self._convert_json_to_text_kb("data/asc_knowledge_base.json")
 
                 files_to_upload = []
+                file_count = 0
                 for filename in os.listdir(kb_text_path):
-
-                    file_count = 0
                     file_path = os.path.join(kb_text_path, filename)
                     if os.path.exists(file_path):
                         with open(file_path, "rb") as file:
-                            file_count +=1
-                            print("Uploading to  Vector Store:", vector_store.name)
+                            # Upload the file to the vector store
+                            print(f"Uploading file: {filename} to Vector Store: {vector_store.name}")
                             file_batch = self.client.vector_stores.file_batches.upload_and_poll(
-                            vector_store_id=vector_store.id,
-                            files=[file]
-                        )
-                            file_count+=1
-                            print("number of files uploaded : ",file_count)
+                                vector_store_id=vector_store.id,
+                                files=[file]
+                            )
+                            file_count += 1
+                            print(f"File upload completed: {filename}")
+                            print(f"Total files uploaded: {file_count}")
                             print(file_batch.status)
                             print(file_batch.file_counts)
-                    else:
-                        continue
 
+                print(f"Upload complete. Total files uploaded: {file_count}")
+
+                # After upload is complete, create a flag file to track it for future sessions
+                with open(flag_file, 'w') as f:
+                    f.write("Upload completed.")
+
+            else:
+                print(f"Vector store already has more than {len(existing_files.data)} file(s). Skipping upload.")
 
         except Exception as e:
             print(f"Error creating/checking for vector store: {e}")
             st.error(f"Failed to create/check vector store: {str(e)}")
             return None
+
 
 
 

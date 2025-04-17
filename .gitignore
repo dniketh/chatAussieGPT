@@ -175,3 +175,4 @@ cython_debug/
 .idea/
 .DS_Store
 .streamlit/secrets.toml
+upload_done.flag
