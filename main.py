@@ -3,6 +3,8 @@ from app.app_structure import (
     setup_page_config,
     apply_custom_css
 )
+setup_page_config()
+
 from app.chat_interface import render_chat_interface
 from app.sidebar_components import render_sidebar
 from app.competencies_component import render_competencies_assessment
@@ -11,7 +13,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-setup_page_config()
+
 
 
 @st.cache_resource

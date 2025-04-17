@@ -98,8 +98,20 @@ def render_skills_display():
     st.subheader("Your Skills")
 
     if st.session_state.skills:
-        # Create a layout for skills as tags
-        skills_html = "<div style='display: flex; flex-wrap: wrap;'>"
+        # Add inline CSS to change text color of skills to black
+        skills_html = """
+        <style>
+            .skill-tag {
+                background-color: #f1f1f1;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 5px 10px;
+                margin: 5px;
+                color: black; /* Change text color to black */
+            }
+        </style>
+        <div style='display: flex; flex-wrap: wrap;'>
+        """
         for skill in st.session_state.skills:
             skills_html += f"<div class='skill-tag'>{skill}</div>"
         skills_html += "</div>"
