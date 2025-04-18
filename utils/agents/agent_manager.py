@@ -1,4 +1,6 @@
 # utils/agents/agent_manager.py
+import re
+
 from openai import OpenAI
 from agents import Agent, Runner, function_tool, FileSearchTool, WebSearchTool, RunContextWrapper,enable_verbose_stdout_logging
 
@@ -214,14 +216,14 @@ class AgentManager:
                 if vector_stores and vector_stores.data:
                     print("Vector Stores Present... ")
                     for vs in vector_stores.data:
-                        if vs.name == 'ASC Knowledge Base':
-                            print("ASC Knowledge Base Vector Found.")
+                        if vs.name == 'ASC Occupation Knowledge Base':
+                            print("ASC Occupation Knowledge Base Vector Found.")
                             vector_store = vs
                             st.session_state["vector_store"] = vector_store
                             break
 
                 if not vector_store:
-                    print("No existing ASC vector store found. Creating new one...")
+                    print("No existing ASC Occupation Knowledge Base vector store found. Creating new one...")
                     vector_store = self.client.vector_stores.create(name="ASC Knowledge Base")
                     st.session_state["vector_store"] = vector_store
                     print(f"Created vector store with ID: {vector_store.id}")
@@ -229,26 +231,57 @@ class AgentManager:
             # Ensure local reference
             vector_store = st.session_state["vector_store"]
 
-
+            # Check if files already exist in the vector store
             existing_files = self.client.vector_stores.files.list(vector_store_id=vector_store.id)
-            print("Existing Files in Vector Store  - ",existing_files)
+            print("Existing Files in Vector Store  - ", existing_files)
 
-            if existing_files and existing_files.data:
-                print(f"Vector store already has {len(existing_files.data)} file(s). Skipping upload.")
+            # Flag file to track if upload has already been done
+            flag_file = 'upload_done.flag'
+
+            # If the flag file exists, we skip the upload process
+            if os.path.exists(flag_file):
+                print("Upload has already been done before. Skipping upload.")
+                return
+
+            # If not, proceed with the upload
+            if not existing_files or len(existing_files.data) <= 2:
+                print("No files found or less than 3 files found in vector store. Uploading...")
+
+                kb_text_path = 'data/files'
+                os.makedirs(kb_text_path, exist_ok=True)
+
+                # Convert JSON to text files if not already done
+                if not os.path.exists(kb_text_path) or not any(
+                        os.path.isfile(os.path.join(kb_text_path, f)) for f in os.listdir(kb_text_path)):
+                    print("Converting JSON to text files...")
+                    self._convert_json_to_text_kb("data/asc_knowledge_base.json")
+
+                files_to_upload = []
+                file_count = 0
+                for filename in os.listdir(kb_text_path):
+                    file_path = os.path.join(kb_text_path, filename)
+                    if os.path.exists(file_path):
+                        with open(file_path, "rb") as file:
+                            # Upload the file to the vector store
+                            print(f"Uploading file: {filename} to Vector Store: {vector_store.name}")
+                            file_batch = self.client.vector_stores.file_batches.upload_and_poll(
+                                vector_store_id=vector_store.id,
+                                files=[file]
+                            )
+                            file_count += 1
+                            print(f"File upload completed: {filename}")
+                            print(f"Total files uploaded: {file_count}")
+                            print(file_batch.status)
+                            print(file_batch.file_counts)
+
+                print(f"Upload complete. Total files uploaded: {file_count}")
+
+                # After upload is complete, create a flag file to track it for future sessions
+                with open(flag_file, 'w') as f:
+                    f.write("Upload completed.")
+
             else:
-                print("No files found in vector store. Uploading...")
-                kb_text_path = "data/asc_knowledge_base.txt"
-                if not os.path.exists(kb_text_path):
-                    self._convert_json_to_text_kb("data/asc_knowledge_base.json", kb_text_path)
-
-                with open(kb_text_path, "rb") as file:
-                    print("Uploading ASC Data to OpenAI Vector Store:", vector_store.name)
-                    file_batch = self.client.vector_stores.file_batches.upload_and_poll(
-                        vector_store_id=vector_store.id,
-                        files=[file]
-                    )
-                    print(file_batch.status)
-                    print(file_batch.file_counts)
+                print(f"Vector store already has more than {len(existing_files.data)} file(s). Skipping upload.")
 
         except Exception as e:
             print(f"Error creating/checking for vector store: {e}")
@@ -259,9 +292,10 @@ class AgentManager:
 
 
 
+
     @staticmethod
-    def _convert_json_to_text_kb(json_path, output_path):
-        """Convert JSON knowledge base to text format"""
+    def _convert_json_to_text_kb(json_path):
+        """Convert JSON knowledge base to text format for each occupation and save it in data folder"""
         try:
             with open(json_path, 'r') as f:
                 data = json.load(f)
@@ -270,7 +304,7 @@ class AgentManager:
             print(f"Error loading JSON file: {e}")
             return
 
-        text_entries = []
+        os.makedirs("data/files", exist_ok=True)
         for entry in kb_entries:
             metadata = entry.get("metadata", {})
             anzsco_code = metadata.get("anzsco_code", "Unknown")
@@ -301,12 +335,15 @@ class AgentManager:
 ## Technology Tools
 {', '.join(tools)}
 """
-            text_entries.append(text_entry)
 
-        combined_text = "\n\n---\n\n".join(text_entries)
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, 'w') as f:
-            f.write(combined_text)
+            safe_title = re.sub(r'[\\/:"*?<>|]+', '_', title)
+            output_path = f"data/files/{safe_title}_{anzsco_code}.txt"
+            if os.path.exists(output_path):
+                print(f"Skipping file creation, file already exists: {output_path}")
+                continue
+            with open(output_path, 'w') as f:
+                f.write(text_entry)
+
 
     def process_user_query(self, user_query):
         """

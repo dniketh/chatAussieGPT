@@ -9,28 +9,25 @@ from app.competencies_component import render_competencies_assessment
 from supabase import create_client
 import os
 from dotenv import load_dotenv
-load_dotenv()
 
+load_dotenv()
 setup_page_config()
 
 
-@st.cache_resource
-def init_supabase_connection():
+def get_user_supabase():
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_KEY")
-    try:
-        client = create_client(url, key)
-        st.success("Connected to Supabase!")
-        return client
-    except Exception as e:
-        st.error(f"Supabase connection failed: {e}")
-        return None
-supabase = init_supabase_connection()
+    client = create_client(url, key)
 
+    if "supabase_session" in st.session_state:
+        client.auth.set_session(
+            st.session_state.supabase_session["access_token"],
+            st.session_state.supabase_session["refresh_token"]
+        )
+    return client
 
 
 def initialize_session_state():
-    """Initialize all session state variables."""
     if "messages" not in st.session_state:
         st.session_state.messages = [
             {"role": "assistant", "content": "Hi there! Welcome to chatAussieGPT. Tell me about your skills and interests, or upload your resume to get personalized career recommendations."}
@@ -47,25 +44,22 @@ def initialize_session_state():
         st.session_state.openai_api_key = ""
 
 
-
-
-
-
 def main():
     initialize_session_state()
     apply_custom_css()
 
-    if not supabase:
-         st.error("Database connection failed. Please check secrets or Supabase status.")
-         return
+    try:
+        supabase = get_user_supabase()
+    except Exception as e:
+        st.error(f"Supabase connection failed: {e}")
+        return
+
     try:
         session = supabase.auth.get_session()
         user_response = supabase.auth.get_user() if session else None
     except Exception as e:
         st.error(f"Error checking Supabase session: {e}")
         user_response = None
-    if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Discover your career path in Australia based on your skills and interests"}]
 
     if not user_response:
         st.title("Welcome to chatAussieGPT")
@@ -80,45 +74,51 @@ def main():
                 submitted = st.form_submit_button("Login")
                 if submitted:
                     try:
+                        supabase = get_user_supabase()
                         session = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        st.session_state.supabase_session = {
+                            "access_token": session.session.access_token,
+                            "refresh_token": session.session.refresh_token
+                        }
                         st.success("Login successful!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Login failed: {e}")
 
         elif choice == "Register":
-             with st.form("register_form"):
-                name = st.text_input("Your Name") # Optional, for profile
+            with st.form("register_form"):
+                name = st.text_input("Your Name")
                 email = st.text_input("Email")
                 password = st.text_input("Password", type="password")
                 password_confirm = st.text_input("Confirm Password", type="password")
                 submitted = st.form_submit_button("Register")
                 if submitted:
                     if not all([name, email, password, password_confirm]):
-                         st.warning("Please fill all fields.")
+                        st.warning("Please fill all fields.")
                     elif password != password_confirm:
-                         st.error("Passwords do not match.")
+                        st.error("Passwords do not match.")
                     elif len(password) < 8:
                         st.warning("Password must be at least 8 characters.")
                     else:
-                         try:
-                             res = supabase.auth.sign_up({
-                                 "email": email,
-                                 "password": password,
-                                 "options": {
-                                     "data": {
-                                         'name': name
-                                     }
-                                 }
-                             })
-                             st.success("Registration successful! Check your email for verification (if enabled). Please log in.")
-                         except Exception as e:
-                             st.error(f"Registration failed: {e}")
-
+                        try:
+                            supabase = get_user_supabase()
+                            res = supabase.auth.sign_up({
+                                "email": email,
+                                "password": password,
+                                "options": {
+                                    "data": {
+                                        'name': name
+                                    }
+                                }
+                            })
+                            st.success("Registration successful! Check your email for verification.")
+                        except Exception as e:
+                            st.error(f"Registration failed: {e}")
     else:
         st.session_state['user'] = user_response
         user = user_response.user
         user_name = user.user_metadata.get('name', user.email)
+
         st.title("chatAussieGPT")
         st.markdown(f"#### Welcome, {user_name}!")
 
@@ -132,15 +132,16 @@ def main():
         else:
             render_chat_interface(supabase, user)
 
-
         with st.sidebar:
-             st.write(f"Logged in as: {user_name}")
-             if st.button("Logout"):
-                  supabase.auth.sign_out()
-                  st.session_state.pop('user', None)
-                  st.rerun()
-             st.divider()
-             render_sidebar(supabase, user)
+            st.write(f"Logged in as: {user_name}")
+            if st.button("Logout"):
+                supabase.auth.sign_out()
+                st.session_state.clear()
+                st.rerun()
+            st.divider()
+            render_sidebar(supabase, user)
+
 
 if __name__ == "__main__":
     main()
+
