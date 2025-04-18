@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.resume_parser import extract_text_from_resume, extract_skills_from_resume
+from utils.resume_parser import extract_text_from_resume, extract_skills_from_resume,parse_resume
 from utils.visualizer import create_simple_skills_visualization
 
 def render_sidebar(st):
@@ -71,18 +71,11 @@ def render_resume_upload():
 
     if uploaded_file:
         with st.spinner("Analyzing your resume..."):
-            # Extract text from resume
-            resume_text = extract_text_from_resume(uploaded_file)
-
-            # Ensure the API key is available
             api_key = st.session_state.get("openai_api_key", "")
 
-            if api_key:
-                # Extract skills from resume text
-                resume_skills = extract_skills_from_resume(resume_text, api_key)
-            else:
-                resume_skills = []
-
+            parsed_resume = parse_resume(uploaded_file, api_key)
+            resume_text = parsed_resume["text"]
+            resume_skills = parsed_resume["skills"]
             if resume_skills:  # Only proceed if skills were extracted
                 # Update skills list
                 new_skills_count = 0

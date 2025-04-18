@@ -2,24 +2,33 @@ import PyPDF2
 import docx2txt
 import re
 import streamlit as st
-import openai
+import spacy
 from openai import OpenAI
 import ast
+
+# ------------------------ LOAD SPACY MODEL ------------------------
+
+@st.cache_resource
+def load_spacy_model():
+    return spacy.load("en_core_web_sm")
+
+nlp = load_spacy_model()
 
 # ------------------------ MAIN PARSER ------------------------
 
 def parse_resume(uploaded_file, api_key=None):
-    """
-    Parse resume file and store extracted skills in session state.
-    """
     resume_text = extract_text_from_resume(uploaded_file)
 
-    # Step 1: Use agent to extract skills from the resume
-    skills = extract_skills_from_resume(resume_text, api_key)
+    # Step 1: Mask personal info using spaCy
+    masked_text = mask_pii_spacy_au(resume_text)
+    st.markdown("### 🔍 Masked Resume Text:")
+    st.code(masked_text)
+
+    # Step 2: Use OpenAI agent to extract skills from masked resume
+    skills = extract_skills_from_resume(masked_text, api_key)
 
     if "resume_skills" not in st.session_state:
         st.session_state.resume_skills = []
-
     for skill in skills:
         if skill not in st.session_state.resume_skills:
             st.session_state.resume_skills.append(skill)
@@ -37,7 +46,6 @@ def extract_text_from_resume(uploaded_file):
     text = ""
     try:
         file_type = uploaded_file.type
-
         if "pdf" in file_type:
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
             for page in pdf_reader.pages:
@@ -46,51 +54,77 @@ def extract_text_from_resume(uploaded_file):
             text = docx2txt.process(uploaded_file)
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
-
-        text = clean_text(text)
-
+        return clean_text(text)
     except Exception as e:
         st.error(f"Error extracting text from resume: {str(e)}")
+        return ""
 
-    return text
+# ------------------------ PII MASKING FOR AUSTRALIA ------------------------
 
-# ------------------------ SKILL PARSER USING AGENT ------------------------
+def mask_pii_spacy_au(text):
+    doc = nlp(text)
+    masked_text = text
 
-def extract_skills_from_resume(resume_text, api_key):
-    """
-    Use GPT-based agent to extract skills from the resume text.
-    """
-    return extract_skills_with_agent(resume_text, api_key)
+    # --------- EMAIL ---------
+    masked_text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL]', masked_text)
+
+    # --------- PHONE (Australian Mobile & General) ---------
+    masked_text = re.sub(r'(\+61[\s\-]?|0)?4\d{2}[\s\-]?\d{3}[\s\-]?\d{3}', '[PHONE]', masked_text)
+
+    # --------- FULL ADDRESSES ---------
+    masked_text = re.sub(
+        r'\b\d+\s[\w\s]+,\s*[\w\s]+,\s*(NSW|VIC|QLD|SA|WA|TAS|ACT|NT)[\s\-]*\d{4}\b', 
+        '[ADDRESS]', masked_text, flags=re.IGNORECASE)
+
+    # --------- PARTIAL ADDRESSES (street + suburb, no postcode) ---------
+    masked_text = re.sub(
+        r'\b\d+\s[\w\s]+,\s*[\w\s]+', 
+        '[ADDRESS]', masked_text, flags=re.IGNORECASE)
+
+    # --------- CITY NAMES ---------
+    cities = ['sydney', 'melbourne', 'brisbane', 'perth', 'adelaide', 'hobart', 'canberra', 'darwin']
+    for city in cities:
+        masked_text = re.sub(rf'\b{city}\b', '[CITY]', masked_text, flags=re.IGNORECASE)
+
+    # --------- STATE NAMES ---------
+    states = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT']
+    for state in states:
+        masked_text = re.sub(rf'\b{state}\b', '[STATE]', masked_text, flags=re.IGNORECASE)
+
+    # --------- PERSON NAMES ---------
+    for ent in doc.ents:
+        if ent.label_ == "PERSON":
+            masked_text = masked_text.replace(ent.text, "[NAME]")
+
+    return masked_text
+
+# ------------------------ SKILL PARSING ------------------------
+
+def extract_skills_from_resume(masked_text, api_key):
+    return extract_skills_with_agent(masked_text, api_key)
 
 def extract_skills_with_agent(resume_text, api_key):
-    """
-    Use OpenAI to extract skills (both technical and soft skills) from resume text.
-    """
     client = OpenAI(api_key=api_key)
 
     prompt = f"""
 You are a resume parsing assistant.
 
-Only extract skills that are explicitly mentioned in the resume **under headings such as 'Skills', 'Technical Skills', 'Key Skills', or similar skill sections**.
+Extract only technical skills listed under the "Technologies" section of the resume. Focus only on lines under headings like "Proficient", "Familiar", or similar. Do not infer any soft skills or personality traits unless explicitly listed under a skills heading.
 
-DO NOT extract skills or terms mentioned in the job descriptions, projects, or experience sections — only include what is listed under the designated skills section.
+Include only:
+- Programming languages
+- Tools and libraries
+- Frameworks and platforms
+- Cloud technologies
 
-Only include:
-- Programming languages (e.g., Python, SQL)
-- Tools and software (e.g., Tableau, Power BI, Excel, Git)
-- Platforms or frameworks (e.g., TensorFlow, AWS)
-- Soft skills (e.g., communication, leadership) **only if listed in the skills section**
+Ignore:
+- Any skills not under 'Technologies', 'Skills', or 'Technical Skills' sections
+- Descriptive phrases, soft skills, business terms, or general qualities
+- Any duplicate or redundant terms
 
-❌ Exclude:
-- Algorithms (e.g., random forest, logistic regression)
-- Evaluation metrics (e.g., accuracy, F1-score)
-- Methods (e.g., hyperparameter tuning, EDA)
-- Anything not listed in the skills/key skills section
+Return the result as a **valid Python list of lowercase strings**.
 
-Return the result as a valid **Python list of lowercase strings** like:
-["python", "sql", "tableau", "power bi", "communication"]
-
-Here is the resume text:
+Resume:
 \"\"\"
 {resume_text}
 \"\"\"
@@ -106,16 +140,22 @@ Here is the resume text:
             temperature=0.2,
             max_tokens=300
         )
-
         content = response.choices[0].message.content.strip()
 
-        # Safely parse output as list
         try:
             skills = ast.literal_eval(content)
+            if isinstance(skills, list):
+                return [s.strip().lower() for s in skills if isinstance(s, str)]
+            else:
+                return []
         except:
-            skills = [s.strip().lower() for s in content.split(",")]
+            lowered = content.lower()
+            if "no skills can be extracted" in lowered or "no valid skill section" in lowered:
+                return []
+            else:
+                skills = [s.strip().lower() for s in re.findall(r"'(.*?)'", content)]
+                return skills if skills else []
 
-        return [s for s in skills if isinstance(s, str) and s]
     except Exception as e:
         st.warning(f"Agent skill extraction failed: {str(e)}")
         return []
@@ -123,9 +163,6 @@ Here is the resume text:
 # ------------------------ TEXT CLEANING ------------------------
 
 def clean_text(text):
-    """
-    Clean and preprocess resume text (removing unnecessary spaces, newlines, etc.).
-    """
     text = re.sub(r'\n+', '\n', text)
     text = re.sub(r'\s+', ' ', text)
     text = text.replace('\xa0', ' ')
