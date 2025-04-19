@@ -1,5 +1,5 @@
 import streamlit as st
-
+from utils.supabase_client import supabase
 def get_user_profile(supabase, user):
     try:
         response = supabase.table('profiles').select('*').eq('id', user.iselectd).maybe_single().execute()
@@ -47,3 +47,38 @@ def save_user_competencies(supabase, user, ratings_dict):
     except Exception as e:
         st.error(f"Error saving competencies: {e}")
         return False
+    
+def save_user_skills_to_supabase(supabase, user, skills):
+    """
+    Save extracted skills to Supabase for the given user in the competency format.
+    
+    Args:
+        supabase: Supabase client object
+        user: Supabase authenticated user object
+        skills: List of extracted skills
+    
+    Returns:
+        (success: bool, number of new skills saved)
+    """
+    saved_count = 0
+    try:
+        data_to_upsert = []
+        for skill in skills:
+            # Check if this skill already exists for this user
+            existing = supabase.table("user_skills").select("skill_id").eq("user_id", user.id).eq("skill", skill).execute()
+            if existing.data:
+                continue  # Skip duplicates
+
+            data_to_upsert.append({
+                "user_id": user.id,
+                "skill": skill
+            })
+
+        if data_to_upsert:
+            response = supabase.table("user_skills").upsert(data_to_upsert).execute()
+            saved_count = len(data_to_upsert)
+        
+        return True, saved_count
+    except Exception as e:
+        st.error(f"Error saving skills to Supabase as competencies: {e}")
+        return False, 0

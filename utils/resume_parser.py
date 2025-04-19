@@ -2,35 +2,45 @@ import PyPDF2
 import docx2txt
 import re
 import streamlit as st
-from gpt4all import GPT4All
-from pathlib import Path
+import spacy
+from openai import OpenAI
+import ast
+from utils.supabase_data_utils import save_user_skills_to_supabase
+from utils.supabase_client import supabase
+# ------------------------ LOAD SPACY MODEL ------------------------
 
-# ------------------------ MODEL INITIALIZATION ------------------------
 @st.cache_resource
-def load_local_llm():
-    model_dir = Path.home() / "Library/Application Support/nomic.ai/GPT4All"
-    model_filename = "Meta-Llama-3-8B-Instruct.Q4_0.gguf"
-    model_path = model_dir / model_filename
+def load_spacy_model():
+    return spacy.load("en_core_web_sm")
 
-    assert model_path.is_file(), f"Model file not found at {model_path}"
-
-    return GPT4All(model_name=model_filename, model_path=str(model_dir), allow_download=False)
-
-llm = load_local_llm()
+nlp = load_spacy_model()
 
 # ------------------------ MAIN PARSER ------------------------
 
-def parse_resume(uploaded_file):
+def parse_resume(uploaded_file, api_key=None, supabase=None, user=None):
     resume_text = extract_text_from_resume(uploaded_file)
-    skills = extract_skills_from_resume(resume_text)
 
+    # Step 1: Mask personal info using spaCy
+    masked_text = mask_pii_spacy_au(resume_text)
+    st.markdown("### 🔍 Masked Resume Text:")
+    st.code(masked_text)
+
+    # Step 2: Extract skills using OpenAI agent
+    skills = extract_skills_from_resume(masked_text, api_key)
+
+    # Save unique skills to session
     if "resume_skills" not in st.session_state:
         st.session_state.resume_skills = []
-
     for skill in skills:
         if skill not in st.session_state.resume_skills:
             st.session_state.resume_skills.append(skill)
+    success, num_saved = save_user_skills_to_supabase(supabase, user, st.session_state.resume_skills)
+    if success:
+        st.success(f"✅ {num_saved} new skills saved to your Supabase profile!")
+    else:
+        st.warning("⚠️ No new skills were added (may already exist).")
 
+    # Step 4: Save resume text to session
     st.session_state.resume_text = resume_text
 
     return {
@@ -44,7 +54,6 @@ def extract_text_from_resume(uploaded_file):
     text = ""
     try:
         file_type = uploaded_file.type
-
         if "pdf" in file_type:
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
             for page in pdf_reader.pages:
@@ -53,81 +62,134 @@ def extract_text_from_resume(uploaded_file):
             text = docx2txt.process(uploaded_file)
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
-
-        text = clean_text(text)
-
+        return clean_text(text)
     except Exception as e:
         st.error(f"Error extracting text from resume: {str(e)}")
+        return ""
 
-    return text
+# ------------------------ PII MASKING FOR AUSTRALIA ------------------------
 
-# ------------------------ SKILL PARSER USING LOCAL LLM ------------------------
+def mask_pii_spacy_au(text):
+    doc = nlp(text)
+    masked_text = text
 
-def extract_skills_from_resume(resume_text):
+    # --------- EMAIL ---------
+    masked_text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL]', masked_text)
+
+    # --------- PHONE (Australian Mobile & General) ---------
+    masked_text = re.sub(r'(\+61[\s\-]?|0)?4\d{2}[\s\-]?\d{3}[\s\-]?\d{3}', '[PHONE]', masked_text)
+
+    # --------- FULL ADDRESSES ---------
+    masked_text = re.sub(
+        r'\b\d+\s[\w\s]+,\s*[\w\s]+,\s*(NSW|VIC|QLD|SA|WA|TAS|ACT|NT)[\s\-]*\d{4}\b',
+        '[ADDRESS]', masked_text, flags=re.IGNORECASE)
+
+    # --------- PARTIAL ADDRESSES (street + suburb, no postcode) ---------
+    masked_text = re.sub(
+        r'\b\d+\s[\w\s]+,\s*[\w\s]+',
+        '[ADDRESS]', masked_text, flags=re.IGNORECASE)
+
+    # --------- CITY NAMES ---------
+    cities = ['sydney', 'melbourne', 'brisbane', 'perth', 'adelaide', 'hobart', 'canberra', 'darwin']
+    for city in cities:
+        masked_text = re.sub(rf'\b{city}\b', '[CITY]', masked_text, flags=re.IGNORECASE)
+
+    # --------- STATE NAMES ---------
+    states = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT']
+    for state in states:
+        masked_text = re.sub(rf'\b{state}\b', '[STATE]', masked_text, flags=re.IGNORECASE)
+
+    # --------- PERSON NAMES ---------
+    # Uncomment if you want spaCy to mask names too
+    # for ent in doc.ents:
+    #     if ent.label_ == "PERSON":
+    #         masked_text = masked_text.replace(ent.text, "[NAME]")
+
+    return masked_text
+
+# ------------------------ SKILL PARSING ------------------------
+
+def extract_skills_from_resume(masked_text, api_key):
+    return extract_skills_with_agent(masked_text, api_key)
+
+def extract_skills_with_agent(resume_text, api_key):
+    client = OpenAI(api_key=api_key)
+
     prompt = f"""
 You are a resume parsing assistant.
 
-Extract all skills that are **explicitly listed** under skill-related sections such as:
-- "Skills"
-- "Technical Skills"
-- "Key Skills"
-- "Core Competencies"
-- "Technologies"
-- "Tools & Frameworks"
-- "Cloud & Data Analytics"
-
-✅ Only extract skills from the above sections — ignore job descriptions, project work, experience, education, and general text.
-
-✅ Do NOT make up, rewrite, or add extra words. Return the exact terms mentioned, just in lowercase.
-
-If no valid skill-related section is found in the resume, return an empty list: []
-
+Extract only technical skills listed under the "Technologies" section of the resume. Focus only on lines under headings like "Proficient", "Familiar", or similar. Do not infer any soft skills or personality traits unless explicitly listed under a skills heading.
 Include only:
-- Programming languages (e.g., Python, SQL, C, Java)
-- Tools and software (e.g., Tableau, Power BI, Excel, Git)
-- Libraries or frameworks (e.g., TensorFlow, Scikit-learn, PyTorch, LangChain)
-- Cloud platforms or technologies (e.g., AWS, GCP, Azure)
-- Soft skills **only if clearly listed under the skills section**
+- Programming languages
+- Tools and libraries
+- Frameworks and platforms
+- Cloud technologies
 
-Return the result as a valid **Python list of lowercase strings** like:
-["python", "sql", "power bi", "git"]
+Ignore:
+- Any skills not under 'Technologies', 'Skills', or 'Technical Skills' sections
+- Descriptive phrases, soft skills, business terms, or general qualities
+- Any duplicate or redundant terms
+- Don't include anything from extra sections like "Experience", "Education", or "Projects"
+Return the result as a **valid Python list of lowercase strings**.
 
-Resume text:
+Resume:
 \"\"\"
 {resume_text}
 \"\"\"
 """
 
-
-    
     try:
-        with llm.chat_session():
-            output = llm.generate(prompt, max_tokens=300)
-            print("🔎 RAW OUTPUT:\n", output)
-        return parse_skill_list(output)
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful resume parser."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=300
+        )
+        content = response.choices[0].message.content.strip()
+
+        try:
+            skills = ast.literal_eval(content)
+            if isinstance(skills, list):
+                return [s.strip().lower() for s in skills if isinstance(s, str)]
+            else:
+                return []
+        except:
+            lowered = content.lower()
+            if "no skills can be extracted" in lowered or "no valid skill section" in lowered:
+                return []
+            else:
+                skills = [s.strip().lower() for s in re.findall(r"'(.*?)'", content)]
+                return skills if skills else []
+
     except Exception as e:
-        st.warning(f"Local model skill extraction failed: {str(e)}")
+        st.warning(f"Agent skill extraction failed: {str(e)}")
         return []
 
-# ------------------------ SKILL LIST PARSER ------------------------
+# ------------------------ SAVE SKILLS TO SUPABASE ------------------------
 
-def parse_skill_list(text):
-    try:
-        # Try evaluating the list safely
-        parsed = eval(text.strip(), {"__builtins__": None}, {})
-        if isinstance(parsed, list):
-            return [skill.lower().strip() for skill in parsed if isinstance(skill, str)]
-    except:
-        pass
+# def save_user_skills_to_supabase(supabase, user, skills):
+#     saved_count = 0
+#     try:
+#         for skill in skills:
+#             existing = supabase.table("user_skills").select("skill_id").eq("user_id", user.id).eq("skill", skill).execute()
+#             if existing.data:
+#                 continue  # Skill already exists
 
-    # Fallback regex parsing
-    match = re.search(r'\[(.*?)\]', text, re.DOTALL)
-    if match:
-        items = re.findall(r'["\'](.*?)["\']', match.group(1))
-        return list(set(item.lower().strip() for item in items))
-    
-    return []
+#             response = supabase.table("user_skills").insert({
+#                 "user_id": user.id,
+#                 "skill": skill
+#             }).execute()
 
+#             if response.data:
+#                 saved_count += 1
+
+#         return True, saved_count
+#     except Exception as e:
+#         print(f"Error saving skills to Supabase: {e}")
+#         return False, 0
 
 # ------------------------ TEXT CLEANING ------------------------
 
