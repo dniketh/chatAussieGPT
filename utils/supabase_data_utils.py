@@ -36,17 +36,58 @@ def get_user_competencies(supabase, user):
 
 def save_user_competencies(supabase, user, ratings_dict):
     try:
-        data_to_upsert = [
-            {"user_id": user.id ,  "competency_name": name, "rating": rating}
-            for name, rating in ratings_dict.items()
-        ]
-        if not data_to_upsert:
-            return True # Nothing to save
-        response = supabase.table('user_competencies').upsert(data_to_upsert).execute()
-        return True
+        # Step 1: Fetch existing ratings
+        existing_response = (
+            supabase.table("user_competencies")
+            .select("competency_name, rating")
+            .eq("user_id", user.id)
+            .execute()
+        )
+
+        existing_data = {
+            item["competency_name"]: item["rating"]
+            for item in existing_response.data
+        } if existing_response.data else {}
+
+        # Step 2: Check if everything is already up-to-date
+        all_same = all(existing_data.get(name) == rating for name, rating in ratings_dict.items())
+        if all_same and len(existing_data) == len(ratings_dict):
+            return "already_exists", 0
+
+        # Step 3: Update or insert ratings
+        saved_count = 0
+        for name, rating in ratings_dict.items():
+            if existing_data.get(name) != rating:
+                # Try update first
+                update_result = supabase.table("user_competencies") \
+                    .update({"rating": rating}) \
+                    .eq("user_id", user.id) \
+                    .eq("competency_name", name) \
+                    .execute()
+
+                if not update_result.data:
+                    insert_result = supabase.table("user_competencies") \
+                        .insert({
+                            "user_id": user.id,
+                            "competency_name": name,
+                            "rating": rating
+                        }) \
+                        .execute()
+
+                    if insert_result.data:
+                        saved_count += 1
+                else:
+                    saved_count += 1
+
+        if saved_count > 0:
+            return "updated", saved_count
+        else:
+            return "already_exists", 0
+
     except Exception as e:
-        st.error(f"Error saving competencies: {e}")
-        return False
+        st.error(f"❌ Something went wrong while saving competencies: {e}")
+        return "error", 0
+
     
 def save_user_skills_to_supabase(supabase, user, skills):
     """
@@ -58,27 +99,39 @@ def save_user_skills_to_supabase(supabase, user, skills):
         skills: List of extracted skills
     
     Returns:
-        (success: bool, number of new skills saved)
+        (status: str, count: int)
+            status can be "already_exists", "saved", or "error"
     """
     saved_count = 0
     try:
-        data_to_upsert = []
-        for skill in skills:
-            # Check if this skill already exists for this user
-            existing = supabase.table("user_skills").select("skill_id").eq("user_id", user.id).eq("skill", skill).execute()
-            if existing.data:
-                continue  # Skip duplicates
+        # Fetch all existing skills for this user that match any of the input skills
+        existing = (
+            supabase.table("user_skills")
+            .select("skill")
+            .eq("user_id", user.id)
+            .in_("skill", skills)
+            .execute()
+        )
 
-            data_to_upsert.append({
-                "user_id": user.id,
-                "skill": skill
-            })
+        existing_skills = {item["skill"] for item in existing.data}
+
+        # Check if all skills already exist
+        if len(existing_skills) == len(set(skills)):
+            return "already_exists", 0
+
+        # Otherwise, prepare only new skills to upsert
+        data_to_upsert = [
+            {"user_id": user.id, "skill": skill}
+            for skill in skills
+            if skill not in existing_skills
+        ]
 
         if data_to_upsert:
-            response = supabase.table("user_skills").upsert(data_to_upsert).execute()
+            supabase.table("user_skills").upsert(data_to_upsert).execute()
             saved_count = len(data_to_upsert)
-        
-        return True, saved_count
+
+        return "saved", saved_count
+
     except Exception as e:
-        st.error(f"Error saving skills to Supabase as competencies: {e}")
-        return False, 0
+        st.error(f"Error saving skills to Supabase: {e}")
+        return "error", 0

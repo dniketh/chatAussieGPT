@@ -78,13 +78,18 @@ def render_resume_upload(user):
 
                 if st.session_state.skills:
                     st.success(f"Found {len(st.session_state.skills)} skills in your resume!")
+                    # Add message to chat if conversation just started
                     if len(st.session_state.messages) <= 2:
                         skill_list = st.session_state.skills[:5]
                         skill_message = f"Based on your resume, I can see you have skills in: {', '.join(skill_list)}"
                         if len(st.session_state.skills) > 5:
                             skill_message += f" and {len(st.session_state.skills) - 5} more."
-                        full_message = f"{skill_message}\n\nWhat kind of career are you interested in exploring?"
+
+                        recommendation_message = "What kind of career are you interested in exploring?"
+
+                        full_message = f"{skill_message}\n\n{recommendation_message}"
                         st.session_state.messages.append({"role": "assistant", "content": full_message})
+
                 else:
                     st.warning("No skills could be extracted from the resume. Try uploading a different file or check formatting.")
 

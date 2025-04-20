@@ -31,14 +31,21 @@ def parse_resume(uploaded_file, api_key=None, supabase=None, user=None):
     # Save unique skills to session
     if "resume_skills" not in st.session_state:
         st.session_state.resume_skills = []
+
+    # Add only new skills to session state
     for skill in skills:
         if skill not in st.session_state.resume_skills:
             st.session_state.resume_skills.append(skill)
-    success, num_saved = save_user_skills_to_supabase(supabase, user, st.session_state.resume_skills)
-    if success:
-        st.success(f"✅ {num_saved} new skills saved to your Supabase profile!")
+
+    # Save to Supabase and handle responses
+    status, num_saved = save_user_skills_to_supabase(supabase, user, st.session_state.resume_skills)
+
+    if status == "saved":
+        st.success(f"✅ {num_saved} new skills saved to your Database profile!")
+    elif status == "already_exists":
+        st.info("ℹ️ All extracted skills already exist in your profile.")
     else:
-        st.warning("⚠️ No new skills were added (may already exist).")
+        st.error("❌ An error occurred while saving your skills.")
 
     # Step 4: Save resume text to session
     st.session_state.resume_text = resume_text
