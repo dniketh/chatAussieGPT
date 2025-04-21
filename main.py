@@ -3,16 +3,18 @@ from app.app_structure import (
     setup_page_config,
     apply_custom_css
 )
+setup_page_config()
 from app.chat_interface import render_chat_interface
 from app.sidebar_components import render_sidebar
 from app.competencies_component import render_competencies_assessment
 from supabase import create_client
-import os
 from dotenv import load_dotenv
+import os
+from utils.supabase_data_utils import fetch_saved_skills, fetch_saved_competencies
+from utils.visualizer import create_svg_skills_visualization, categorize_skills_with_gpt
 
+# Load environment variables
 load_dotenv()
-setup_page_config()
-
 
 def get_user_supabase():
     url = os.environ.get("SUPABASE_URL")
@@ -42,6 +44,9 @@ def initialize_session_state():
         st.session_state.show_skills_map = False
     if "openai_api_key" not in st.session_state:
         st.session_state.openai_api_key = ""
+    # ✅ Add missing key
+    if "show_skills_popup" not in st.session_state:
+        st.session_state.show_skills_popup = False
 
 
 def main():
@@ -119,6 +124,15 @@ def main():
         user = user_response.user
         user_name = user.user_metadata.get('name', user.email)
 
+        # ✅ Fetch and load saved skills from Supabase
+        if not st.session_state.skills:
+            try:
+                saved_skills = fetch_saved_skills(supabase, user.id)
+                if saved_skills:
+                    st.session_state.skills = saved_skills
+            except Exception as e:
+                st.warning(f"Could not load saved skills: {e}")
+
         st.title("chatAussieGPT")
         st.markdown(f"#### Welcome, {user_name}!")
 
@@ -141,7 +155,57 @@ def main():
             st.divider()
             render_sidebar(supabase, user)
 
+        # ✅ Show skills popup (visualization)
+        if st.session_state.get("show_skills_popup", False) and st.session_state.skills:
+            st.markdown("""
+            <style>
+                html, body { overflow: hidden !important; }
+                .popup-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    background-color: rgba(0, 0, 0, 0.6);
+                    z-index: 10000;
+                }
+                .popup-content {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 90%;
+                    max-width: 1000px;
+                    background-color: white;
+                    padding: 30px;
+                    border-radius: 12px;
+                    z-index: 10001;
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+                    overflow-y: auto;
+                    max-height: 90vh;
+                }
+            </style>
+            """, unsafe_allow_html=True)
+
+            st.subheader("Skills Visualization")
+
+            api_key = st.session_state.get("openai_api_key", "")
+            if not api_key:
+                st.warning("Please provide your OpenAI API key to generate skill visualization.")
+            else:
+                categorized_skills = categorize_skills_with_gpt(st.session_state.skills, api_key)
+                svg = create_svg_skills_visualization(categorized_skills)
+                height = svg.count('<circle') * 100 + 400
+                st.components.v1.html(svg, height=800, width=1200, scrolling=True)
+
+            if st.button("Close Visualization"):
+                st.session_state.show_skills_popup = False
+                st.markdown("<style>html, body { overflow: auto !important; }</style>", unsafe_allow_html=True)
+                st.rerun()
+
+            st.markdown("<style>html, body { overflow: auto !important; }</style>", unsafe_allow_html=True)
+            st.markdown("</div></div>", unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()
-
