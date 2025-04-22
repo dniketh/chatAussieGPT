@@ -1,6 +1,9 @@
 import openai
 import math
 import streamlit as st
+from utils.supabase_data_utils import fetch_saved_skills, fetch_saved_competencies
+# resume_skills = st.session_state.get("resume_skills", [])
+# core_competencies = st.session_state.get("core_competencies", [])
 
 def categorize_skills_with_gpt(skills, api_key):
     """
@@ -56,14 +59,14 @@ def create_svg_skills_visualization(categorized_skills):
     }
 
     center_positions = {
-        "Technical Skills": (250, 200),
-        "Soft Skills": (750, 200),
-        "Business Skills": (250, 500),
-        "Other Skills": (750, 500)
+        "Technical Skills": (200, 200),
+        "Soft Skills": (1000, 200),
+        "Business Skills": (200, 700),
+        "Other Skills": (1000, 700)
     }
 
-    canvas_width = 1200
-    canvas_height = 800
+    canvas_width = 1400
+    canvas_height = 900
 
     svg = f"""
     <div id="svg-container" style="overflow: auto; width: 100%; height: 100%;">
@@ -75,14 +78,7 @@ def create_svg_skills_visualization(categorized_skills):
         center_x, center_y = center_positions.get(category, (canvas_width // 2, canvas_height // 2))
         color = colors.get(category, "#999")
 
-        # Category bubble
-        svg += f"""
-        <circle cx="{center_x}" cy="{center_y}" r="70" fill="{color}" opacity="0.1" />
-        <text x="{center_x}" y="{center_y}" text-anchor="middle" dominant-baseline="middle"
-              font-size="16" font-family="Arial" fill="{color}">{category}</text>
-        """
-
-        # Skill layout
+        # Draw leaf nodes and lines first with lighter colors
         radius = 140 + len(skills) * 2  # Increase spacing dynamically
         angle_step = 360 / max(len(skills), 1)
 
@@ -92,11 +88,47 @@ def create_svg_skills_visualization(categorized_skills):
             y = center_y + radius * math.sin(angle)
 
             svg += f"""
-            <line x1="{center_x}" y1="{center_y}" x2="{x}" y2="{y}" stroke="{color}" stroke-width="1" opacity="0.3"/>
-            <circle cx="{x}" cy="{y}" r="34" fill="{color}" opacity="0.7"/>
+            <line x1="{center_x}" y1="{center_y}" x2="{x}" y2="{y}" stroke="{color}" stroke-width="1" opacity="0.35"/>
+            <circle cx="{x}" cy="{y}" r="30" fill="{color}" opacity="0.35"/>
             <text x="{x}" y="{y}" text-anchor="middle" dominant-baseline="middle"
-                  font-size="11" font-family="Arial" fill="black" stroke="Black" stroke-width="0.5" font-weight="normal">{skill}</text>
+                  font-size="11" font-family="Arial" fill="black" stroke="black" stroke-width="0.3" font-weight="normal">{skill}</text>
             """
+
+        # Draw center node on top with more opacity and depth
+        svg += f"""
+        <circle cx="{center_x}" cy="{center_y}" r="70" fill="{color}" opacity="0.9" />
+        <text x="{center_x}" y="{center_y}" text-anchor="middle" dominant-baseline="middle"
+              font-size="16" font-family="Arial" fill="white" font-weight="bold">{category}</text>
+        """
 
     svg += "</svg></div>"
     return svg
+
+def categorize_skills(supabase, user_id):
+    resume_skills = fetch_saved_skills(supabase,user_id,)
+    core_competencies = fetch_saved_competencies(supabase,user_id)
+
+    categorized = {
+        "Technical Skills": [],
+        "Other Skills": [],
+        "Soft Skills": [],
+        "Business Skills": []
+    }
+
+    # Lowercase version for keyword matching
+    soft_keywords = ["teamwork", "communication", "problem solving", "initiative and innovation", "learning"]
+    business_keywords = ["digital literacy", "planning and organisation", "numeracy", "reading", "writing"]
+
+    # ✅ Soft & Business from core competencies
+    for comp in core_competencies:
+        skill = comp.get("competency_name", "").lower()
+        if skill in soft_keywords:
+            categorized["Soft Skills"].append(skill)
+        if skill in business_keywords:
+            categorized["Business Skills"].append(skill)
+
+    # ✅ Technical skills from resume-extracted
+    for skill in resume_skills:
+        categorized["Technical Skills"].append(skill.lower())
+
+    return categorized

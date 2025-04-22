@@ -136,19 +136,48 @@ def save_user_skills_to_supabase(supabase, user, skills):
         return "error", 0
 
 def fetch_saved_skills(supabase, user_id):
-    response = supabase.table("user_skills") \
-        .select("skill") \
-        .eq("user_id", user_id) \
-        .order("created_at", desc=True) \
-        .limit(1) \
-        .execute()
+    try:
+        response = supabase.table("user_skills").select("skill").eq("user_id", user_id).execute()
+        if response.data:
+            return [entry["skill"] for entry in response.data if "skill" in entry]
+        return []
+    except Exception as e:
+        print("❌ Error fetching skills:", e)
+        return []
 
-    if response.data:
-        return response.data[0].get("skills", [])
-    return []
 
 def fetch_saved_competencies(supabase, user_id):
-    response = supabase.table("user_competencies").select("competencies").eq("user_id", user_id).single().execute()
-    if response.data and "competencies" in response.data:
-        return response.data["competencies"]
-    return []
+    try:
+        response = supabase.table("user_competencies").select("*").eq("user_id", user_id).execute()
+        if response.data:
+            return response.data
+        return []
+    except Exception as e:
+        print(f"Error fetching competencies: {e}")
+        return []
+def get_competency_ratings(supabase, user_id):
+    """
+    Retrieves competency ratings (Business & Soft skills) for a given user from Supabase.
+    Ratings are expected on a scale from 0 to 10.
+    
+    Returns:
+        dict: A dictionary {skill_name: rating}
+    """
+    try:
+        response = supabase.table("user_competencies").select("competency_name", "rating").eq("user_id", user_id).execute()
+
+        if response.error:
+            print(f"Error fetching ratings: {response.error}")
+            return {}
+
+        ratings = {}
+        for record in response.data:
+            skill_name = record.get("competency_name")  # Adjust if your DB uses a different field
+            rating = record.get("rating")
+            if skill_name is not None:
+                ratings[skill_name] = float(rating)
+
+        return ratings
+    except Exception as e:
+        print(f"Error retrieving competency ratings: {e}")
+        return {}
