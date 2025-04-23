@@ -36,16 +36,19 @@ def render_competencies_assessment(st, supabase, user):
                     max_value=10,
                     value=current_rating,
                     step=1,
-                    help="0 = Not applicable, 1 = Beginner, 5 = Expert",
+                    help="0 = Not applicable, 1 = Beginner, 5= Intermediate , 10 = Expert",
                     key=f"slider_{comp_name}"
                 )
 
                 # Save rating to session state
                 st.session_state.core_competencies_ratings[comp_name] = rating
 
-        # Button to submit ratings
         if st.button("Submit Core Competency Ratings"):
-            save_user_competencies(supabase, user, st.session_state.core_competencies_ratings)
-            st.success("Core competency ratings saved! These will be considered in your career recommendations.")
+            status, count = save_user_competencies(supabase, user, st.session_state.core_competencies_ratings)
 
-
+            if status == "updated":
+                st.success(f"✅ {count} competencies updated.")
+            elif status == "already_exists":
+                st.info("ℹ️ All competencies already exist with the same ratings.")
+            else:
+                st.error("❌ Something went wrong while saving competencies.")

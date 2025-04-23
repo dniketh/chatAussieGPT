@@ -1,18 +1,17 @@
+# main.py
 import streamlit as st
-from app.app_structure import (
-    setup_page_config,
-    apply_custom_css
-)
+from app.app_structure import setup_page_config, apply_custom_css
+setup_page_config()
 from app.chat_interface import render_chat_interface
 from app.sidebar_components import render_sidebar
 from app.competencies_component import render_competencies_assessment
 from supabase import create_client
-import os
 from dotenv import load_dotenv
+import os
+from utils.supabase_data_utils import fetch_saved_skills
+from utils.visualizer import create_svg_skills_visualization,categorize_skills
 
 load_dotenv()
-setup_page_config()
-
 
 def get_user_supabase():
     url = os.environ.get("SUPABASE_URL")
@@ -26,23 +25,22 @@ def get_user_supabase():
         )
     return client
 
-
 def initialize_session_state():
-    if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {"role": "assistant", "content": "Hi there! Welcome to chatAussieGPT. Tell me about your skills and interests, or upload your resume to get personalized career recommendations."}
-        ]
-    if "skills" not in st.session_state:
-        st.session_state.skills = []
-    if "career_matches" not in st.session_state:
-        st.session_state.career_matches = []
-    if "conversation_stage" not in st.session_state:
-        st.session_state.conversation_stage = "initial"
-    if "show_skills_map" not in st.session_state:
-        st.session_state.show_skills_map = False
-    if "openai_api_key" not in st.session_state:
-        st.session_state.openai_api_key = ""
-
+    defaults = {
+        "messages": [{
+            "role": "assistant",
+            "content": "Hi there! Welcome to chatAussieGPT. Tell me about your skills and interests, or upload your resume to get personalized career recommendations."
+        }],
+        "skills": [],
+        "career_matches": [],
+        "conversation_stage": "initial",
+        "show_skills_map": False,
+        "openai_api_key": "",
+        "show_skills_popup": False,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
 
 def main():
     initialize_session_state()
@@ -71,8 +69,7 @@ def main():
             with st.form("login_form"):
                 email = st.text_input("Email")
                 password = st.text_input("Password", type="password")
-                submitted = st.form_submit_button("Login")
-                if submitted:
+                if st.form_submit_button("Login"):
                     try:
                         supabase = get_user_supabase()
                         session = supabase.auth.sign_in_with_password({"email": email, "password": password})
@@ -91,8 +88,7 @@ def main():
                 email = st.text_input("Email")
                 password = st.text_input("Password", type="password")
                 password_confirm = st.text_input("Confirm Password", type="password")
-                submitted = st.form_submit_button("Register")
-                if submitted:
+                if st.form_submit_button("Register"):
                     if not all([name, email, password, password_confirm]):
                         st.warning("Please fill all fields.")
                     elif password != password_confirm:
@@ -102,13 +98,11 @@ def main():
                     else:
                         try:
                             supabase = get_user_supabase()
-                            res = supabase.auth.sign_up({
+                            supabase.auth.sign_up({
                                 "email": email,
                                 "password": password,
                                 "options": {
-                                    "data": {
-                                        'name': name
-                                    }
+                                    "data": {'name': name}
                                 }
                             })
                             st.success("Registration successful! Check your email for verification.")
@@ -119,12 +113,19 @@ def main():
         user = user_response.user
         user_name = user.user_metadata.get('name', user.email)
 
+        # ✅ Load saved skills once
+        if not st.session_state.skills:
+            try:
+                saved_skills = fetch_saved_skills(supabase, user.id)
+                if saved_skills:
+                    st.session_state.skills = saved_skills
+            except Exception as e:
+                st.warning(f"Could not load saved skills: {e}")
+
         st.title("chatAussieGPT")
         st.markdown(f"#### Welcome, {user_name}!")
 
-        show_competencies = st.session_state.get("show_competencies", False)
-
-        if show_competencies:
+        if st.session_state.get("show_competencies", False):
             render_competencies_assessment(st, supabase, user)
             if st.button("Back to Chat"):
                 st.session_state.show_competencies = False
@@ -141,7 +142,21 @@ def main():
             st.divider()
             render_sidebar(supabase, user)
 
+        if st.session_state.get("show_skills_popup", False) and st.session_state.skills:
+            st.markdown("<style>html, body { overflow: hidden !important; }</style>", unsafe_allow_html=True)
+            st.subheader("Skills Visualization")
+
+            api_key = st.session_state.get("openai_api_key", "")
+            if not api_key:
+                st.warning("Please provide your OpenAI API key to generate skill visualization.")
+            else:
+                categorized_skills = categorize_skills(supabase, user.id)
+                svg = create_svg_skills_visualization(categorized_skills)
+                st.components.v1.html(svg, height=800, width=1200, scrolling=True)
+            if st.button("Close Visualization"):
+                st.session_state.show_skills_popup = False
+                st.markdown("<style>html, body { overflow: auto !important; }</style>", unsafe_allow_html=True)
+                st.rerun()
 
 if __name__ == "__main__":
     main()
-

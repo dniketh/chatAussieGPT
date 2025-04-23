@@ -1,148 +1,88 @@
+import openai
 import math
-import network as nx
-import random
+import streamlit as st
+from utils.supabase_data_utils import fetch_saved_skills, fetch_saved_competencies
 
-
-def create_simple_skills_visualization(skills):
+def create_svg_skills_visualization(categorized_skills):
     """
-    Create a simple HTML/JS visualization for skills.
-    In a real implementation, this would use a proper visualization library.
-
-    Args:
-        skills: List of skills to visualize
-
-    Returns:
-        str: HTML/JS code for the visualization
-    """
-    # This is a simplified visualization using HTML/JS
-    # In a real implementation, this would use D3.js or similar
-
-    html = """
-    <div id="skills-visualization" style="width:100%; height:100%;">
-        <svg width="100%" height="100%" viewBox="0 0 800 400">
-            <!-- Background -->
-            <rect width="800" height="400" fill="#f8f9fa" rx="10" ry="10" />
+    Creates an SVG string to visualize categorized skills in a non-overlapping, aesthetic layout.
     """
 
-    # Categorize skills
-    categories = {
-        "Technical Skills": [],
-        "Soft Skills": [],
-        "Business Skills": [],
-        "Other Skills": []
-    }
-
-    for skill in skills:
-        if skill in ["Python", "JavaScript", "Java", "C++", "C#", "SQL", "HTML", "CSS",
-                     "React", "Angular", "Node.js", "AWS", "Docker", "Machine Learning",
-                     "Data Analysis", "Data Science"]:
-            categories["Technical Skills"].append(skill)
-        elif skill in ["Communication", "Leadership", "Teamwork", "Problem Solving",
-                       "Critical Thinking", "Time Management", "Adaptability"]:
-            categories["Soft Skills"].append(skill)
-        elif skill in ["Project Management", "Marketing", "Sales", "Business Development",
-                       "Strategy", "Finance", "Accounting"]:
-            categories["Business Skills"].append(skill)
-        else:
-            categories["Other Skills"].append(skill)
-
-    # Colors for categories
     colors = {
-        "Technical Skills": "#4285F4",  # Blue
-        "Soft Skills": "#FBBC05",  # Yellow
-        "Business Skills": "#34A853",  # Green
-        "Other Skills": "#EA4335"  # Red
+        "Technical Skills": "#1f77b4",
+        "Soft Skills": "#ff7f0e",
+        "Business Skills": "#2ca02c"
     }
 
-    # Position circles
-    x_positions = {"Technical Skills": 200, "Soft Skills": 600, "Business Skills": 200, "Other Skills": 600}
-    y_positions = {"Technical Skills": 100, "Soft Skills": 100, "Business Skills": 300, "Other Skills": 300}
+    center_positions = {
+        "Technical Skills": (700, 700),
+        "Soft Skills": (1000, 200),
+        "Business Skills": (400, 200)
+    }
 
-    # Draw category labels
-    for category, pos_x in x_positions.items():
-        pos_y = y_positions[category]
-        color = colors[category]
+    canvas_width = 1400
+    canvas_height = 900
 
-        html += f"""
-        <g>
-            <circle cx="{pos_x}" cy="{pos_y}" r="80" fill="{color}" opacity="0.2" />
-            <text x="{pos_x}" y="{pos_y}" text-anchor="middle" dominant-baseline="middle" 
-                  font-family="Arial" font-size="16" font-weight="bold">{category}</text>
+    svg = f"""
+    <div id="svg-container" style="overflow: auto; width: 100%; height: 100%;">
+        <svg width="{canvas_width}" height="{canvas_height}" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="#f9f9f9" rx="10" ry="10" />
+    """
+
+    for category, skills in categorized_skills.items():
+        center_x, center_y = center_positions.get(category, (canvas_width // 2, canvas_height // 2))
+        color = colors.get(category, "#999")
+
+        # Draw leaf nodes and lines first with lighter colors
+        radius = 140 + len(skills) * 2  # Increase spacing dynamically
+        angle_step = 360 / max(len(skills), 1)
+
+        for i, skill in enumerate(skills):
+            angle = math.radians(i * angle_step)
+            x = center_x + radius * math.cos(angle)
+            y = center_y + radius * math.sin(angle)
+
+            svg += f"""
+            <line x1="{center_x}" y1="{center_y}" x2="{x}" y2="{y}" stroke="{color}" stroke-width="1" opacity="0.35"/>
+            <circle cx="{x}" cy="{y}" r="30" fill="{color}" opacity="0.35"/>
+            <text x="{x}" y="{y}" text-anchor="middle" dominant-baseline="middle"
+                  font-size="11" font-family="Arial" fill="black" stroke="black" stroke-width="0.3" font-weight="normal">{skill}</text>
+            """
+
+        # Draw center node on top with more opacity and depth
+        svg += f"""
+        <circle cx="{center_x}" cy="{center_y}" r="70" fill="{color}" opacity="0.9" />
+        <text x="{center_x}" y="{center_y}" text-anchor="middle" dominant-baseline="middle"
+              font-size="16" font-family="Arial" fill="white" font-weight="bold">{category}</text>
         """
 
-        # Add skills within category
-        skills_in_category = categories[category]
-        if skills_in_category:
-            angle_step = 360 / len(skills_in_category)
-            radius = 60
+    svg += "</svg></div>"
+    return svg
 
-            for i, skill in enumerate(skills_in_category):
-                angle = i * angle_step
-                skill_x = pos_x + radius * math.cos(math.radians(angle))
-                skill_y = pos_y + radius * math.sin(math.radians(angle))
+def categorize_skills(supabase, user_id):
+    resume_skills = fetch_saved_skills(supabase,user_id,)
+    core_competencies = fetch_saved_competencies(supabase,user_id)
 
-                html += f"""
-                <circle cx="{skill_x}" cy="{skill_y}" r="30" fill="{color}" opacity="0.7" />
-                <text x="{skill_x}" y="{skill_y}" text-anchor="middle" dominant-baseline="middle" 
-                      font-family="Arial" font-size="10" fill="white">{skill}</text>
-                <line x1="{pos_x}" y1="{pos_y}" x2="{skill_x}" y2="{skill_y}" 
-                      stroke="{color}" stroke-width="2" opacity="0.5" />
-                """
+    categorized = {
+        "Technical Skills": [],
+        "Soft Skills": [],
+        "Business Skills": []
+    }
 
-        html += "</g>"
+    # Lowercase version for keyword matching
+    soft_keywords = ["teamwork", "communication", "problem solving", "initiative and innovation", "learning"]
+    business_keywords = ["digital literacy", "planning and organisation", "numeracy", "reading", "writing"]
 
-    html += """
-        </svg>
-    </div>
-    """
+    # ✅ Soft & Business from core competencies
+    for comp in core_competencies:
+        skill = comp.get("competency_name", "").lower()
+        if skill in soft_keywords:
+            categorized["Soft Skills"].append(skill)
+        if skill in business_keywords:
+            categorized["Business Skills"].append(skill)
 
-    return html
+    # ✅ Technical skills from resume-extracted
+    for skill in resume_skills:
+        categorized["Technical Skills"].append(skill.lower())
 
-
-def create_career_path_visualization(current_skills, target_job):
-    """
-    Create a visualization of a career path from current skills to target job.
-
-    Args:
-        current_skills: List of user's current skills
-        target_job: Target job data
-
-    Returns:
-        str: HTML for the visualization
-    """
-    # This would be implemented in a real system
-    # For now, return a placeholder
-
-    html = """
-    <div style="width:100%; text-align:center;">
-        <h4>Career Path Visualization Placeholder</h4>
-        <p>This would show a pathway from your current skills to the target job.</p>
-    </div>
-    """
-
-    return html
-
-
-def create_skills_network_graph(skills, skill_relationships):
-    """
-    Create a more advanced skills network visualization.
-    In a real implementation, this would use a proper graph visualization library.
-
-    Args:
-        skills: List of skills
-        skill_relationships: Dictionary of skill relationships
-
-    Returns:
-        str: HTML/JS code for the visualization
-    """
-    # This would be implemented in a real system
-    # For now, return a placeholder
-
-    html = """
-    <div style="width:100%; text-align:center;">
-        <h4>Skills Network Graph Placeholder</h4>
-        <p>This would show a network graph of your skills and their relationships.</p>
-    </div>
-    """
-
-    return html
+    return categorized
