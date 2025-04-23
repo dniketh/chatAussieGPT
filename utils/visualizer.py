@@ -2,49 +2,6 @@ import openai
 import math
 import streamlit as st
 from utils.supabase_data_utils import fetch_saved_skills, fetch_saved_competencies
-# resume_skills = st.session_state.get("resume_skills", [])
-# core_competencies = st.session_state.get("core_competencies", [])
-
-def categorize_skills_with_gpt(skills, api_key):
-    """
-    Categorizes a list of skills using GPT into categories:
-    Technical, Soft, Business, and Other.
-    """
-    openai.api_key = api_key
-
-    prompt = f"""
-You are a helpful assistant who categorizes skills.
-Given the following list of skills, categorize them into:
-- Technical Skills
-- Soft Skills
-- Business Skills
-- Other Skills
-
-Return a valid Python dictionary with the category names as keys
-and lists of skills as values.
-
-Skills: {skills}
-"""
-
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=600
-        )
-        result = response.choices[0].message.content.strip()
-        categories = eval(result) if result.startswith("{") else {}
-        return categories
-    except Exception as e:
-        print("Error in categorization:", e)
-        return {
-            "Technical Skills": [],
-            "Soft Skills": [],
-            "Business Skills": [],
-            "Other Skills": skills
-        }
-
 
 def create_svg_skills_visualization(categorized_skills):
     """
@@ -54,15 +11,13 @@ def create_svg_skills_visualization(categorized_skills):
     colors = {
         "Technical Skills": "#1f77b4",
         "Soft Skills": "#ff7f0e",
-        "Business Skills": "#2ca02c",
-        "Other Skills": "#d62728"
+        "Business Skills": "#2ca02c"
     }
 
     center_positions = {
-        "Technical Skills": (200, 200),
+        "Technical Skills": (700, 700),
         "Soft Skills": (1000, 200),
-        "Business Skills": (200, 700),
-        "Other Skills": (1000, 700)
+        "Business Skills": (400, 200)
     }
 
     canvas_width = 1400
@@ -110,7 +65,6 @@ def categorize_skills(supabase, user_id):
 
     categorized = {
         "Technical Skills": [],
-        "Other Skills": [],
         "Soft Skills": [],
         "Business Skills": []
     }

@@ -7,6 +7,7 @@ from utils.supabase_data_utils import fetch_saved_competencies
 
 def render_sidebar(supabase, user):
     user_id = user.id
+    
 
     with st.container():
         st.subheader("Quick Actions")
@@ -23,7 +24,12 @@ def render_sidebar(supabase, user):
         if st.session_state.get("career_matches"):
             render_career_matches()
 
-        render_prompt_suggestions()
+        # ✅ Safely access agent_manager from session state
+        agent_manager = st.session_state.get("agent_manager")
+        if agent_manager:
+            render_prompt_suggestions(agent_manager)
+        else:
+            st.sidebar.info("Prompt suggestions will appear after your first query.")
 
 
 def render_api_key_input():
@@ -115,7 +121,7 @@ def render_career_matches():
         st.markdown(f"**{match['title']}** — {match['match_score']}% match")
 
 
-def render_prompt_suggestions():
+def render_prompt_suggestions(agent_manager):
     st.subheader("Try asking:")
     for prompt in [
         "What careers match my skills?",
@@ -124,7 +130,14 @@ def render_prompt_suggestions():
     ]:
         if st.button(prompt):
             st.session_state.messages.append({"role": "user", "content": prompt})
+
+            # Run the agent and get the response
+            response = agent_manager.process_user_query(prompt)
+
+            # Append the agent's response to the chat
+            st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
+
 
 
 def render_user_competencies(supabase, user_id):

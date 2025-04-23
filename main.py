@@ -9,7 +9,7 @@ from supabase import create_client
 from dotenv import load_dotenv
 import os
 from utils.supabase_data_utils import fetch_saved_skills
-from utils.visualizer import create_svg_skills_visualization, categorize_skills_with_gpt,categorize_skills
+from utils.visualizer import create_svg_skills_visualization,categorize_skills
 
 load_dotenv()
 

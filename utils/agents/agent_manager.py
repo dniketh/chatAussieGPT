@@ -216,7 +216,7 @@ class AgentManager:
                 if vector_stores and vector_stores.data:
                     print("Vector Stores Present... ")
                     for vs in vector_stores.data:
-                        if vs.name == 'ASC Occupation Knowledge Base':
+                        if vs.name == 'ASC Knowledge Base':
                             print("ASC Occupation Knowledge Base Vector Found.")
                             vector_store = vs
                             st.session_state["vector_store"] = vector_store
