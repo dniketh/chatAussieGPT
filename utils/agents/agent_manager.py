@@ -317,7 +317,7 @@ class AgentManager:
                 if vector_stores and vector_stores.data:
                     print("Vector Stores Present... ")
                     for vs in vector_stores.data:
-                        if vs.name == 'ASC Knowledge Base':
+                        if vs.name == 'ASC Knowledge Base V2':
                             print("ASC Occupation Knowledge Base Vector Found.")
                             vector_store = vs
                             st.session_state["vector_store"] = vector_store
@@ -325,7 +325,7 @@ class AgentManager:
 
                 if not vector_store:
                     print("No existing ASC Occupation Knowledge Base vector store found. Creating new one...")
-                    vector_store = self.client.vector_stores.create(name="ASC Knowledge Base")
+                    vector_store = self.client.vector_stores.create(name="ASC Knowledge Base V2")
                     st.session_state["vector_store"] = vector_store
                     print(f"Created vector store with ID: {vector_store.id}")
 
