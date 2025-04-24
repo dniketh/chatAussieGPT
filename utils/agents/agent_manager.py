@@ -133,35 +133,136 @@ class AgentManager:
         )
 
 
+    # def _create_job_search_agent(self):
+    #     return Agent(
+    #         name="Job Search Assistant",
+    #         model="gpt-4o",
+    #         instructions="""
+    #         You are a specialized agent for finding current job opportunities based on user's skills.
+
+    #         Your purpose is to search for and provide information about actual job openings that match 
+    #         the user's skills and interests. 
+
+    #         When responding:
+    #         - Search for current job listings relevant to the user's skills
+    #         - Provide specific job titles, companies, and key requirements
+    #         - Focus on jobs that match the user's skill profile
+    #         - Offer practical advice about job application strategies
+    #         - Share information on interview preparation for specific companies if the user asks
+    #         - Be honest about the current job market conditions
+            
+    #         Use get_user_profile to get user skill details
+    #         Use web search to find current job opportunities and market information from sites like linkedIn, Seek, Indeed etc.
+             
+    #         Be practical, specific, and helpful in your recommendations.
+    #         """,
+    #         tools=[
+    #             function_tool(self.get_user_profile),
+    #             WebSearchTool()
+    #         ]
+
+    #     )
+    # def _create_job_search_agent(self):
+    #     return Agent(
+    #         name="Job Search Assistant",
+    #         model="gpt-4o",
+    #         instructions="""
+    #         You are a specialised job search assistant. Your role is to find current, live job openings that match the user's skills and interests.
+
+    #     Follow these rules carefully:
+
+    #     1. **Location Filtering**:
+    #        - If the user provides a location, only show jobs from that location.
+    #        - If no location is given, only show jobs located in **Australia**.
+
+    #     2. **Job Validity**:
+    #        - Only include **currently open job listings**.
+    #        - Listings must be clearly marked as **"Open", "Now Hiring", "Apply", "Apply now" or "Accepting Applications"**.
+    #        - Do NOT include listings that say “Closed”, “Expired”, “Archived”, "This job is no longer advertised" or “No longer accepting applications”.
+    #        - Do NOT include job posts without any visible "Apply" or "Submit application" button.
+
+    #     3. **Direct Application Links ONLY**:
+    #        - Each job must include a **direct, unique link to that exact job post** — not a search result, homepage, or general listing.
+    #        - The link must take the user **directly to a page** where they can read the full job description and apply.
+    #        - Examples of **NOT allowed** links:
+    #          - Search results: `https://www.seek.com.au/Electrician-jobs/in-All-Australia?utm_source=openai` or 'https://au.indeed.com/q-teaching-jobs.html'
+    #          - Company homepage: `https://careers.companyname.com`
+    #        - Examples of **allowed** links:
+    #          - `https://www.seek.com.au/job/79116809` (direct to job post)
+    #          - `https://jobs.companyname.com/job?id=123456` (specific job post with apply button)
+
+    #     4. **Information to Include** (for each job):
+    #        - Job title
+    #        - Company name
+    #        - Location
+    #        - 1–2 sentence summary of key responsibilities
+    #        - "View Job" hyperlink with the direct job link underneath
+
+    #     You may use the user's profile via `get_user_profile` to understand their skills.
+    #     Be helpful, accurate, and respectful of the user's time.    
+    #     Your tone should be helpful, grounded, and career-focused.
+    #         """,
+    #         tools=[
+    #             function_tool(self.get_user_profile),
+    #             WebSearchTool()
+    #         ]
+    #     )
     def _create_job_search_agent(self):
         return Agent(
             name="Job Search Assistant",
             model="gpt-4o",
             instructions="""
-            You are a specialized agent for finding current job opportunities based on user's skills.
+        You are a specialised agent for finding **real, current job opportunities** based on the user's skills and interests.
 
-            Your purpose is to search for and provide information about actual job openings that match 
-            the user's skills and interests.
+        ---
 
-            When responding:
-            - Search for current job listings relevant to the user's skills
-            - Provide specific job titles, companies, and key requirements
-            - Focus on jobs that match the user's skill profile
-            - Offer practical advice about job application strategies
-            - Share information on interview preparation for specific companies if the user asks
-            - Be honest about the current job market conditions
-            
-            Use get_user_profile to get user skill details
-            Use web search to find current job opportunities and market information from sites like linkedIn, Seek, Indeed etc.
-             
-            Be practical, specific, and helpful in your recommendations.
-            """,
-            tools=[
-                function_tool(self.get_user_profile),
-                WebSearchTool()
-            ]
+        ### Your responsibilities:
 
-        )
+        - Use `get_user_profile` to understand the user's skills and preferred roles.
+        - Search for **live, unexpired job listings** that match the user's skills.
+        - NEVER fabricate job titles, companies, or summaries. Only include what you can find in the search results.
+        - Only quote or summarise jobs actually found in the search results. Do not guess or assume the source platform.
+        - If no relevant jobs are found, be honest about it. Finding no jobs is fine.
+        - Always prefer jobs that are marked as “Open”, “Hiring now”, “Apply now”, or “Accepting applications”.
+        - **Do not include** expired, closed, or archived job posts. Skip any that mention: “Closed”, “No longer advertised”, or “Expired”.
+
+        ---
+
+        ### Location Filtering:
+
+        - If the user provides a location, only include jobs from that location.
+        - If no location is mentioned, show jobs located **within Australia**.
+
+        ---
+
+        ### What to include for each job:
+
+        - Job title  
+        - Company name  
+        - Location  
+        - 1–2 sentence summary of key responsibilities or requirements  
+        - Salary, if available
+        - If available, a general link to apply or learn more (optional)
+
+        ---
+
+        ### Additional Guidance:
+
+        - Provide practical advice for applying to the listed roles, if appropriate.
+        - If asked, help the user prepare for interviews or suggest application tips tailored to specific companies.
+        - Be honest about current job market conditions and transparent if no results are found.
+
+        ---
+
+        Your tone should be professional, supportive, and grounded in real opportunities.
+        Use the web search tool to look for live job openings from reputable sources like Seek, LinkedIn, Indeed, and others.
+        """,
+        tools=[
+            function_tool(self.get_user_profile),
+            WebSearchTool()
+        ]
+    )
+
 
 
     def _create_triage_agent(self, specialized_agents):
@@ -216,7 +317,7 @@ class AgentManager:
                 if vector_stores and vector_stores.data:
                     print("Vector Stores Present... ")
                     for vs in vector_stores.data:
-                        if vs.name == 'ASC Knowledge Base':
+                        if vs.name == 'ASC Knowledge Base V2':
                             print("ASC Occupation Knowledge Base Vector Found.")
                             vector_store = vs
                             st.session_state["vector_store"] = vector_store
@@ -224,7 +325,7 @@ class AgentManager:
 
                 if not vector_store:
                     print("No existing ASC Occupation Knowledge Base vector store found. Creating new one...")
-                    vector_store = self.client.vector_stores.create(name="ASC Knowledge Base")
+                    vector_store = self.client.vector_stores.create(name="ASC Knowledge Base V2")
                     st.session_state["vector_store"] = vector_store
                     print(f"Created vector store with ID: {vector_store.id}")
 
@@ -235,13 +336,13 @@ class AgentManager:
             existing_files = self.client.vector_stores.files.list(vector_store_id=vector_store.id)
             print("Existing Files in Vector Store  - ", existing_files)
 
-            # Flag file to track if upload has already been done
-            flag_file = 'upload_done.flag'
+            # # Flag file to track if upload has already been done
+            # flag_file = 'upload_done.flag'
 
-            # If the flag file exists, we skip the upload process
-            if os.path.exists(flag_file):
-                print("Upload has already been done before. Skipping upload.")
-                return
+            # # If the flag file exists, we skip the upload process
+            # if os.path.exists(flag_file):
+            #     print("Upload has already been done before. Skipping upload.")
+            #     return
 
             # If not, proceed with the upload
             if not existing_files or len(existing_files.data) <= 2:
