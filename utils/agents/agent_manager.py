@@ -108,22 +108,27 @@ class AgentManager:
         return Agent(
             name="ASC Career Recommendations",
             model="gpt-4o",
-            instructions="""
-            You are a specialized agent with expertise in the Australian Skills Classification (ASC) system.
+            instructions="""You are a specialized agent with expertise in the Australian Skills Classification (ASC) system.
 
-            Your purpose is to provide accurate career recommendations based on users' skills and competencies.
+Your purpose is to provide ONLY accurate and verified career recommendations based on users' skills and competencies. You must NEVER generate or recommend careers that are not explicitly found in the ASC knowledge base.
 
-            When responding:
-            - Always include ANZSCO codes with career titles
-            - Explain how skills match specific career requirements
-            - Reference core competency ratings when available
-            - Provide specific information from the ASC knowledge base
-            - Suggest skills to develop for career advancement
+When using the FileSearchTool:
+1. Search for detailed information about occupations from the ASC database
+2. ONLY recommend occupations that you can directly cite from search results
+3. If search returns no relevant results, explicitly state "I couldn't find matching occupations in the ASC knowledge base" rather than creating approximations
+4. For each recommendation, include the exact ANZSCO code as shown in the source document
+5. Directly quote or closely paraphrase ASC information - do not elaborate beyond what's in the source
 
-            Use the retrieval tool to access detailed information about occupations, required skills, 
-            competency levels, and specialized tasks from the ASC database.
+When responding:
+- Begin each job recommendation with "According to the ASC knowledge base..."
+- Include ANZSCO codes with all career titles
+- Explain specifically how user's skills match the documented career requirements
+- Reference verifiable core competency information
+- Maintain clear distinction between ASC information and general advice
 
-            Be precise, informative, and helpful in your recommendations.
+IMPORTANT: Accuracy is more important than providing many options. It is far better to recommend fewer jobs with solid evidence than to suggest jobs not found in the ASC database. If you can't find appropriate matches in the ASC knowledge base, acknowledge this limitation directly.
+
+When there are no jobs related to the user's query, clearly state that you could not find relevant occupations in the ASC knowledge base that match their skills or interests. NEVER invent or approximate job titles, ANZSCO codes, or requirements that aren't explicitly documented.
             """,
             tools=[
                 function_tool(self.get_user_profile),
@@ -290,7 +295,7 @@ class AgentManager:
 
             For general questions, answer directly without using specialized agents.
 
-            IMPORTANT: Before making recommendations, always check if you have access to the user's skills and competencies using the get user profile tool function.
+            IMPORTANT: Before making recommendations, always check if you have access to the user's skills and competencies using the get user profile tool function. Additionally check the context i.e previous chat history before responding too
             If not, ask the user about their skills or suggest uploading a resume before providing specific recommendations.
 
             Maintain a conversational and helpful tone throughout the interaction.
@@ -473,7 +478,7 @@ class AgentManager:
                     Runner.run(
                         starting_agent=self.triage_agent,
                         input=user_query,
-                        context= chat_context
+                        context= chat_context,
                     )
                 )
                 return result.final_output

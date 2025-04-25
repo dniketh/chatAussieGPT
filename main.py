@@ -113,7 +113,6 @@ def main():
         user = user_response.user
         user_name = user.user_metadata.get('name', user.email)
 
-        # ✅ Load saved skills once
         if not st.session_state.skills:
             try:
                 saved_skills = fetch_saved_skills(supabase, user.id)
