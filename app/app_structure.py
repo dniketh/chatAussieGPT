@@ -21,6 +21,8 @@ def apply_custom_css():
         .user-message {background-color: #e6f7ff;}
         .assistant-message {background-color: #f0f0f0;}
         .stButton button {width: 100%;}
+
+        /* Skill tags */
         .skill-tag {
             display: inline-block;
             background-color: #f0f7fa;
@@ -30,19 +32,59 @@ def apply_custom_css():
             margin: 4px;
             font-size: 14px;
         }
+
+        /* Suggestion button styling */
         .suggestion-button button {
             text-align: left;
             background-color: #f9f9f9;
             border: 1px solid #e0e0e0;
         }
+
+        /* Career cards */
         .career-card {
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 16px;
         }
+
+        /* Progress bar */
         .stProgress > div > div > div > div {
             background-color: #4e8cff;
+        }
+
+        /* -------- New additions for forms -------- */
+
+        /* Center login/register forms */
+        div.stForm {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 450px;
+            margin: 0 auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        /* Beautify input fields */
+        input, textarea {
+            border-radius: 8px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        /* Make buttons pretty */
+        button[kind="primary"] {
+            border-radius: 8px;
+            background-color: #1E90FF;
+            color: white;
+            font-weight: bold;
+            padding: 10px 20px;
+        }
+
+        /* Button hover effect */
+        button[kind="primary"]:hover {
+            background-color: #187bcd;
         }
     </style>
     """, unsafe_allow_html=True)

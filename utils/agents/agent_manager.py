@@ -378,8 +378,8 @@ class AgentManager:
                 print(f"Upload complete. Total files uploaded: {file_count}")
 
                 # After upload is complete, create a flag file to track it for future sessions
-                with open(flag_file, 'w') as f:
-                    f.write("Upload completed.")
+                #with open(flag_file, 'w') as f:
+                   # f.write("Upload completed.")
 
             else:
                 print(f"Vector store already has more than {len(existing_files.data)} file(s). Skipping upload.")
@@ -457,7 +457,7 @@ class AgentManager:
             str: Generated response
         """
         os.environ["OPENAI_API_KEY"] = self.api_key
-
+        chat_context = {"messages": st.session_state.messages}
         if not self.triage_agent:
             if not self.initialize_agents():
                 return "I couldn't initialize the career guidance system. Please check your API key in the sidebar."
@@ -472,7 +472,8 @@ class AgentManager:
                 result = loop.run_until_complete(
                     Runner.run(
                         starting_agent=self.triage_agent,
-                        input=user_query
+                        input=user_query,
+                        context= chat_context
                     )
                 )
                 return result.final_output

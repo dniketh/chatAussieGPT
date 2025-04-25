@@ -24,7 +24,7 @@ def render_sidebar(supabase, user):
         if st.session_state.get("career_matches"):
             render_career_matches()
 
-        # ✅ Safely access agent_manager from session state
+
         agent_manager = st.session_state.get("agent_manager")
         if agent_manager:
             render_prompt_suggestions(agent_manager)
