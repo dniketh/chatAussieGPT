@@ -17,10 +17,8 @@ def get_user_skills(supabase, user):
 
 def add_user_skill(supabase, user, skill):
     try:
-        # Use upsert=True if you want to ignore duplicates based on UNIQUE constraint
         response = supabase.table('user_skills').insert({"user_id": user.id, "skill": skill}, upsert=True).execute()
-        # Check response.data to see if insert happened or was ignored
-        return len(response.data) > 0 # True if inserted/updated
+        return len(response.data) > 0
     except Exception as e:
         st.error(f"Error adding skill: {e}")
         return False
@@ -35,7 +33,7 @@ def get_user_competencies(supabase, user):
 
 def save_user_competencies(supabase, user, ratings_dict):
     try:
-        # Step 1: Fetch existing ratings
+
         existing_response = (
             supabase.table("user_competencies")
             .select("competency_name, rating")
@@ -48,16 +46,14 @@ def save_user_competencies(supabase, user, ratings_dict):
             for item in existing_response.data
         } if existing_response.data else {}
 
-        # Step 2: Check if everything is already up-to-date
         all_same = all(existing_data.get(name) == rating for name, rating in ratings_dict.items())
         if all_same and len(existing_data) == len(ratings_dict):
             return "already_exists", 0
 
-        # Step 3: Update or insert ratings
         saved_count = 0
         for name, rating in ratings_dict.items():
             if existing_data.get(name) != rating:
-                # Try update first
+
                 update_result = supabase.table("user_competencies") \
                     .update({"rating": rating}) \
                     .eq("user_id", user.id) \
@@ -103,7 +99,6 @@ def save_user_skills_to_supabase(supabase, user, skills):
     """
     saved_count = 0
     try:
-        # Fetch all existing skills for this user that match any of the input skills
         existing = (
             supabase.table("user_skills")
             .select("skill")
@@ -114,11 +109,9 @@ def save_user_skills_to_supabase(supabase, user, skills):
 
         existing_skills = {item["skill"] for item in existing.data}
 
-        # Check if all skills already exist
         if len(existing_skills) == len(set(skills)):
             return "already_exists", 0
 
-        # Otherwise, prepare only new skills to upsert
         data_to_upsert = [
             {"user_id": user.id, "skill": skill}
             for skill in skills
@@ -172,7 +165,7 @@ def get_competency_ratings(supabase, user_id):
 
         ratings = {}
         for record in response.data:
-            skill_name = record.get("competency_name")  # Adjust if your DB uses a different field
+            skill_name = record.get("competency_name")
             rating = record.get("rating")
             if skill_name is not None:
                 ratings[skill_name] = float(rating)

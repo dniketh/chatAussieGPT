@@ -138,80 +138,6 @@ When there are no jobs related to the user's query, clearly state that you could
         )
 
 
-    # def _create_job_search_agent(self):
-    #     return Agent(
-    #         name="Job Search Assistant",
-    #         model="gpt-4o",
-    #         instructions="""
-    #         You are a specialized agent for finding current job opportunities based on user's skills.
-
-    #         Your purpose is to search for and provide information about actual job openings that match 
-    #         the user's skills and interests. 
-
-    #         When responding:
-    #         - Search for current job listings relevant to the user's skills
-    #         - Provide specific job titles, companies, and key requirements
-    #         - Focus on jobs that match the user's skill profile
-    #         - Offer practical advice about job application strategies
-    #         - Share information on interview preparation for specific companies if the user asks
-    #         - Be honest about the current job market conditions
-            
-    #         Use get_user_profile to get user skill details
-    #         Use web search to find current job opportunities and market information from sites like linkedIn, Seek, Indeed etc.
-             
-    #         Be practical, specific, and helpful in your recommendations.
-    #         """,
-    #         tools=[
-    #             function_tool(self.get_user_profile),
-    #             WebSearchTool()
-    #         ]
-
-    #     )
-    # def _create_job_search_agent(self):
-    #     return Agent(
-    #         name="Job Search Assistant",
-    #         model="gpt-4o",
-    #         instructions="""
-    #         You are a specialised job search assistant. Your role is to find current, live job openings that match the user's skills and interests.
-
-    #     Follow these rules carefully:
-
-    #     1. **Location Filtering**:
-    #        - If the user provides a location, only show jobs from that location.
-    #        - If no location is given, only show jobs located in **Australia**.
-
-    #     2. **Job Validity**:
-    #        - Only include **currently open job listings**.
-    #        - Listings must be clearly marked as **"Open", "Now Hiring", "Apply", "Apply now" or "Accepting Applications"**.
-    #        - Do NOT include listings that say “Closed”, “Expired”, “Archived”, "This job is no longer advertised" or “No longer accepting applications”.
-    #        - Do NOT include job posts without any visible "Apply" or "Submit application" button.
-
-    #     3. **Direct Application Links ONLY**:
-    #        - Each job must include a **direct, unique link to that exact job post** — not a search result, homepage, or general listing.
-    #        - The link must take the user **directly to a page** where they can read the full job description and apply.
-    #        - Examples of **NOT allowed** links:
-    #          - Search results: `https://www.seek.com.au/Electrician-jobs/in-All-Australia?utm_source=openai` or 'https://au.indeed.com/q-teaching-jobs.html'
-    #          - Company homepage: `https://careers.companyname.com`
-    #        - Examples of **allowed** links:
-    #          - `https://www.seek.com.au/job/79116809` (direct to job post)
-    #          - `https://jobs.companyname.com/job?id=123456` (specific job post with apply button)
-
-    #     4. **Information to Include** (for each job):
-    #        - Job title
-    #        - Company name
-    #        - Location
-    #        - 1–2 sentence summary of key responsibilities
-    #        - "View Job" hyperlink with the direct job link underneath
-
-    #     You may use the user's profile via `get_user_profile` to understand their skills.
-    #     Be helpful, accurate, and respectful of the user's time.    
-    #     Your tone should be helpful, grounded, and career-focused.
-    #         """,
-    #         tools=[
-    #             function_tool(self.get_user_profile),
-    #             WebSearchTool()
-    #         ]
-    #     )
     def _create_job_search_agent(self):
         return Agent(
             name="Job Search Assistant",
@@ -334,29 +260,18 @@ When there are no jobs related to the user's query, clearly state that you could
                     st.session_state["vector_store"] = vector_store
                     print(f"Created vector store with ID: {vector_store.id}")
 
-            # Ensure local reference
             vector_store = st.session_state["vector_store"]
 
-            # Check if files already exist in the vector store
             existing_files = self.client.vector_stores.files.list(vector_store_id=vector_store.id)
             print("Existing Files in Vector Store  - ", existing_files)
 
-            # # Flag file to track if upload has already been done
-            # flag_file = 'upload_done.flag'
 
-            # # If the flag file exists, we skip the upload process
-            # if os.path.exists(flag_file):
-            #     print("Upload has already been done before. Skipping upload.")
-            #     return
-
-            # If not, proceed with the upload
             if not existing_files or len(existing_files.data) <= 2:
                 print("No files found or less than 3 files found in vector store. Uploading...")
 
                 kb_text_path = 'data/files'
                 os.makedirs(kb_text_path, exist_ok=True)
 
-                # Convert JSON to text files if not already done
                 if not os.path.exists(kb_text_path) or not any(
                         os.path.isfile(os.path.join(kb_text_path, f)) for f in os.listdir(kb_text_path)):
                     print("Converting JSON to text files...")
@@ -382,9 +297,6 @@ When there are no jobs related to the user's query, clearly state that you could
 
                 print(f"Upload complete. Total files uploaded: {file_count}")
 
-                # After upload is complete, create a flag file to track it for future sessions
-                #with open(flag_file, 'w') as f:
-                   # f.write("Upload completed.")
 
             else:
                 print(f"Vector store already has more than {len(existing_files.data)} file(s). Skipping upload.")

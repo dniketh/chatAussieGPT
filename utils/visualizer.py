@@ -33,8 +33,8 @@ def create_svg_skills_visualization(categorized_skills):
         center_x, center_y = center_positions.get(category, (canvas_width // 2, canvas_height // 2))
         color = colors.get(category, "#999")
 
-        # Draw leaf nodes and lines first with lighter colors
-        radius = 140 + len(skills) * 2  # Increase spacing dynamically
+
+        radius = 140 + len(skills) * 2
         angle_step = 360 / max(len(skills), 1)
 
         for i, skill in enumerate(skills):
@@ -69,11 +69,9 @@ def categorize_skills(supabase, user_id):
         "Business Skills": []
     }
 
-    # Lowercase version for keyword matching
     soft_keywords = ["teamwork", "communication", "problem solving", "initiative and innovation", "learning"]
     business_keywords = ["digital literacy", "planning and organisation", "numeracy", "reading", "writing"]
 
-    # ✅ Soft & Business from core competencies
     for comp in core_competencies:
         skill = comp.get("competency_name", "").lower()
         if skill in soft_keywords:
@@ -81,7 +79,6 @@ def categorize_skills(supabase, user_id):
         if skill in business_keywords:
             categorized["Business Skills"].append(skill)
 
-    # ✅ Technical skills from resume-extracted
     for skill in resume_skills:
         categorized["Technical Skills"].append(skill.lower())
 
