@@ -13,7 +13,7 @@ chatAussieGPT is a  Agentic career guidance system that uses the Australian Skil
 
 - **Skills Extraction**: Automatically extracts skills from user input and uploaded resumes
 - **Core Competency Assessment**: Allows users to self-assess against ASC core competencies
-- **Career Matching**: Provides career recommendations based on skills and competencies
+- **Career Matching**: Provides career recommendations based on skills and competencies from the ASC taxonomy
 - **Live Job Search**: Connects to web search to find current job openings that match user profiles
 - **Interactive Chat Interface**: Offers a natural language interface for career guidance
 
@@ -29,8 +29,9 @@ The system uses an agent-based architecture with specialized components:
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.9.X
 - OpenAI API key
+- Supabase Project url and keys
 
 ### Setup
 
@@ -42,7 +43,7 @@ The system uses an agent-based architecture with specialized components:
 
 2. Create and activate a virtual environment:
    ```
-   python -m venv .venv
+   python3.9 -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
@@ -69,18 +70,21 @@ The system uses an agent-based architecture with specialized components:
    - Get career recommendations
    - Search for job opportunities
 
+
 ## Project Structure
 
 ```
 ├── main.py                     # Entry point for the Streamlit app
 ├── data/                       # Data files
 │   └── asc_knowledge_base.json # ASC dataset knowledge base
-├── utils/                      # Utility modules
-│   ├── agents/                 # Agent system
+├── utils/
+|   |---__init__.py                   # Utility modules
+│   ├── agents/
+|   |   |-- __init__py                 # Agent system
 │   │   └── agent_manager.py    # Manages agent interactions
 │   ├── asc_data.py             # ASC dataset utilities
 │   |
-│   ├── llm_service.py          # LLM integration service
+│   ├── llm_service.py          # File to call AgentManager.py
 │   ├── resume_parser.py        # Resume parsing utilities
 │   |
 │   └── visualizer.py           # Visualization utilities
@@ -93,19 +97,20 @@ The system uses an agent-based architecture with specialized components:
 
 ## Development Notes
 
-- The ASC knowledge base is stored as a json file which will be converted to text and uploaded to OpenAI for vector search
-- Skills extraction currently uses pattern matching, with plans to implement NLP models
-- Visualizations use simplified HTML/JS with plans to implement more advanced data visualization libraries
+- The ASC knowledge base is stored as a json file which will be converted to text files for each occupation and uploaded to OpenAI for vector search
+- Skills extraction currently uses pattern matching and NER, with plans to implement advanced NLP models
+- Visualizations use simplified SVG format with plans to implement more advanced data visualization libraries
 
 ## API Key Management
 
 - API keys are stored only in the session state and never saved to disk
-- You can provide an API key through the UI or set the `OPENAI_API_KEY` environment variable
+- You can provide an API key through the UI side bar component
 
 ## Important Implementation Details
 
-1. When first running the app, you may need to refresh after adding your API key
-2. The current implementation uses placeholder visualizations and mock data for some components
+1. Register by creating an account and confirm your email
+2. Login with your username and password
+3. Add your openAI API Key in the sidebar
 3. The core agent system is fully functional with real OpenAI integration
 
 ## Future Enhancements
@@ -123,3 +128,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
