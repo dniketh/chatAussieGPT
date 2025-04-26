@@ -9,10 +9,8 @@ def generate_response(supabase, user, user_query):
     Generate a response using the agent system.
     """
 
-    # Get API key from session state
     api_key = st.session_state.get("openai_api_key")
 
-    # Check if API key is available
     if not api_key:
         return "Please provide an OpenAI API key in the sidebar to use advanced features."
 

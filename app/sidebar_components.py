@@ -1,4 +1,4 @@
-# sidebar_components.py
+
 import streamlit as st
 from utils.resume_parser import parse_resume
 from utils.visualizer import create_svg_skills_visualization, categorize_skills
@@ -79,8 +79,7 @@ def render_resume_upload(supabase, user):
 def render_skills_display(supabase, user_id):
     st.subheader("Your Skills")
 
-    # Debug print
-    #st.write("Session skills:", st.session_state.get("skills"))
+
 
     if st.session_state.get("skills"):
         skill_html = "<div style='display: flex; flex-wrap: wrap;'>"
@@ -109,10 +108,7 @@ def render_skills_display(supabase, user_id):
 
             categorized = categorize_skills(supabase, user_id)
             svg = create_svg_skills_visualization(categorized)
-            # st.markdown("### 🧠 Skill Map")
-            # st.components.v1.html(svg, height=500, scrolling=True)
-        # else:
-        #     st.info("No skills identified yet.")
+
 
 
 def render_career_matches():
@@ -131,10 +127,8 @@ def render_prompt_suggestions(agent_manager):
         if st.button(prompt):
             st.session_state.messages.append({"role": "user", "content": prompt})
 
-            # Run the agent and get the response
             response = agent_manager.process_user_query(prompt)
 
-            # Append the agent's response to the chat
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
 

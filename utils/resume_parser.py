@@ -6,7 +6,7 @@ import spacy
 from openai import OpenAI
 import ast
 from utils.supabase_data_utils import save_user_skills_to_supabase
-# ------------------------ LOAD SPACY MODEL ------------------------
+
 
 @st.cache_resource
 def load_spacy_model():
@@ -14,29 +14,23 @@ def load_spacy_model():
 
 nlp = load_spacy_model()
 
-# ------------------------ MAIN PARSER ------------------------
 
 def parse_resume(uploaded_file, api_key=None, supabase=None, user=None):
     resume_text = extract_text_from_resume(uploaded_file)
 
-    # Step 1: Mask personal info using spaCy
     masked_text = mask_pii_spacy_au(resume_text)
     st.markdown("### 🔍 Masked Resume Text:")
     st.code(masked_text)
 
-    # Step 2: Extract skills using OpenAI agent
     skills = extract_skills_from_resume(masked_text, api_key)
 
-    # Save unique skills to session
     if "resume_skills" not in st.session_state:
         st.session_state.resume_skills = []
 
-    # Add only new skills to session state
     for skill in skills:
         if skill not in st.session_state.resume_skills:
             st.session_state.resume_skills.append(skill)
 
-    # Save to Supabase and handle responses
     status, num_saved = save_user_skills_to_supabase(supabase, user, st.session_state.resume_skills)
 
     if status == "saved":
@@ -46,7 +40,6 @@ def parse_resume(uploaded_file, api_key=None, supabase=None, user=None):
     else:
         st.error("❌ An error occurred while saving your skills.")
 
-    # Step 4: Save resume text to session
     st.session_state.resume_text = resume_text
 
     return {
@@ -54,7 +47,6 @@ def parse_resume(uploaded_file, api_key=None, supabase=None, user=None):
         "text": resume_text
     }
 
-# ------------------------ FILE HANDLING ------------------------
 
 def extract_text_from_resume(uploaded_file):
     text = ""
@@ -73,7 +65,6 @@ def extract_text_from_resume(uploaded_file):
         st.error(f"Error extracting text from resume: {str(e)}")
         return ""
 
-# ------------------------ PII MASKING FOR AUSTRALIA ------------------------
 
 def mask_pii_spacy_au(text):
     doc = nlp(text)
@@ -105,15 +96,9 @@ def mask_pii_spacy_au(text):
     for state in states:
         masked_text = re.sub(rf'\b{state}\b', '[STATE]', masked_text, flags=re.IGNORECASE)
 
-    # --------- PERSON NAMES ---------
-    # Uncomment if you want spaCy to mask names too
-    # for ent in doc.ents:
-    #     if ent.label_ == "PERSON":
-    #         masked_text = masked_text.replace(ent.text, "[NAME]")
 
     return masked_text
 
-# ------------------------ SKILL PARSING ------------------------
 
 def extract_skills_from_resume(masked_text, api_key):
     return extract_skills_with_agent(masked_text, api_key)
@@ -174,30 +159,7 @@ Resume:
         st.warning(f"Agent skill extraction failed: {str(e)}")
         return []
 
-# ------------------------ SAVE SKILLS TO SUPABASE ------------------------
 
-# def save_user_skills_to_supabase(supabase, user, skills):
-#     saved_count = 0
-#     try:
-#         for skill in skills:
-#             existing = supabase.table("user_skills").select("skill_id").eq("user_id", user.id).eq("skill", skill).execute()
-#             if existing.data:
-#                 continue  # Skill already exists
-
-#             response = supabase.table("user_skills").insert({
-#                 "user_id": user.id,
-#                 "skill": skill
-#             }).execute()
-
-#             if response.data:
-#                 saved_count += 1
-
-#         return True, saved_count
-#     except Exception as e:
-#         print(f"Error saving skills to Supabase: {e}")
-#         return False, 0
-
-# ------------------------ TEXT CLEANING ------------------------
 
 def clean_text(text):
     text = re.sub(r'\n+', '\n', text)
