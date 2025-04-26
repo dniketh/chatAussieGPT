@@ -29,7 +29,7 @@ The system uses an agent-based architecture with specialized components:
 
 ### Prerequisites
 
-- Python 3.9.X
+- Python 3.9 version is *IMPORTANT*
 - OpenAI API key
 - Supabase Project url and keys
 
@@ -69,6 +69,25 @@ The system uses an agent-based architecture with specialized components:
    - Assess your core competencies
    - Get career recommendations
    - Search for job opportunities
+  
+## Docker Setup
+
+### Build the Docker Image
+
+1. Make sure you have Docker installed and running and clone the repo
+2. Build the Docker image using the following command:
+   ```
+   docker build -t chat-aussie-gpt-docker .
+   
+   ```
+### Run the Docker Container
+
+1. After building the image, run the container with:
+   ```
+   docker run -p 8501:8501 chat-aussie-gpt-docker
+   ```
+2. Once the container is running, open your browser and go to: http://localhost:8501
+   
 
 
 ## Project Structure
