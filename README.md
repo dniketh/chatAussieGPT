@@ -38,7 +38,7 @@ The system uses an agent-based architecture with specialized components:
 1. Clone the repository:
    ```
    git clone https://github.com/dniketh/chatAussieGPT.git
-   cd career-guide-ai
+   cd chatAussieGPT
    ```
 
 2. Create and activate a virtual environment:
