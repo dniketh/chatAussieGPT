@@ -70,32 +70,35 @@ The system uses an agent-based architecture with specialized components:
    - Get career recommendations
    - Search for job opportunities
 
+
 ## Project Structure
 
-├── main.py
-├── data/
-│   └── asc_knowledge_base.json
+```
+├── main.py                     # Entry point for the Streamlit app
+├── data/                       # Data files
+│   └── asc_knowledge_base.json # ASC dataset knowledge base
 ├── utils/
-│   ├── __init__.py
+|   |---__init__.py                   # Utility modules
 │   ├── agents/
-│   │   ├── __init__.py
-│   │   └── agent_manager.py
-│   ├── asc_data.py
-│   ├── llm_service.py
-│   ├── resume_parser.py
-│   └── visualizer.py
-└── app/
-    ├── __init__.py
-    ├── app_structure.py
-    ├── chat_interface.py
-    ├── competencies_component.py
-    └── sidebar_components.py
+|   |   |-- __init__py                 # Agent system
+│   │   └── agent_manager.py    # Manages agent interactions
+│   ├── asc_data.py             # ASC dataset utilities
+│   |
+│   ├── llm_service.py          # File to call AgentManager.py
+│   ├── resume_parser.py        # Resume parsing utilities
+│   |
+│   └── visualizer.py           # Visualization utilities
+└── app/                        # App interface components
+    ├── app_structure.py        # Page layout
+    ├── chat_interface.py       # Chat UI
+    ├── competencies_component.py # Competency assessment UI
+    └── sidebar_components.py   # Sidebar UI elements
 ```
 
 ## Development Notes
 
 - The ASC knowledge base is stored as a json file which will be converted to text files for each occupation and uploaded to OpenAI for vector search
-- Skills extraction currently uses pattern matching, with plans to implement NLP models
+- Skills extraction currently uses pattern matching and NER, with plans to implement advanced NLP models
 - Visualizations use simplified SVG format with plans to implement more advanced data visualization libraries
 
 ## API Key Management
@@ -125,3 +128,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
